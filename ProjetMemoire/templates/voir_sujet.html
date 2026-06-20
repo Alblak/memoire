@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+
+{% block title %}Détails du sujet - {{ sujet.titre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .version-timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+    .version-timeline:before {
+        content: '';
+        position: absolute;
+        left: 10px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #dee2e6;
+    }
+    .version-item {
+        position: relative;
+        margin-bottom: 25px;
+    }
+    .version-badge {
+        position: absolute;
+        left: -30px;
+        top: 0;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #0d6efd;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        z-index: 1;
+    }
+    .version-badge.valide { background: #198754; }
+    .version-badge.soumis { background: #ffc107; color: #000; }
+    .version-badge.corrige { background: #0dcaf0; color: #000; }
+    .version-badge.approuve { background: #198754; }
+    .version-card {
+        border-left: 3px solid #0d6efd;
+        transition: all 0.2s;
+    }
+    .version-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .feedback-bubble {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 10px 15px;
+        margin-top: 10px;
+        position: relative;
+    }
+    .feedback-bubble:before {
+        content: '';
+        position: absolute;
+        top: -8px;
+        left: 20px;
+        width: 0;
+        height: 0;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-bottom: 8px solid #f8f9fa;
+    }
+    .soumettre-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        padding: 20px;
+        color: white;
+    }
+    /* Style pour l'indicateur de chapitre courant */
+    .current-chapter-badge {
+        background: #e8f4fd;
+        border-left: 4px solid #0d6efd;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    .current-chapter-badge strong {
+        color: #0d6efd;
+    }
+    /* Badges de statut */
+    .badge-soumis { background: #ffc107; color: #000; }
+    .badge-valide { background: #198754; color: #fff; }
+    .badge-corrige { background: #0dcaf0; color: #000; }
+    .badge-approuve { background: #198754; color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- En-tête du sujet -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                <div>
+                    <span class="badge status-{{ sujet.statut }} mb-2">
+                        {% if sujet.statut == 'en_attente' %}<i class="fas fa-hourglass-half"></i> En attente validation
+                        {% elif sujet.statut == 'approuve' %}<i class="fas fa-check-circle"></i> Approuvé - En attente de début
+                        {% elif sujet.statut == 'en_cours' %}<i class="fas fa-play-circle"></i> En cours
+                        {% elif sujet.statut == 'finalise' %}<i class="fas fa-flag-checkered"></i> Finalisé
+                        {% endif %}
+                    </span>
+                    <h1 class="h3 mt-2">{{ sujet.titre }}</h1>
+                    <p class="text-muted">
+                        <i class="fas fa-chalkboard-user me-1"></i> {{ sujet.directeur_nom or 'Directeur non encore attribué' }}
+                        {% if sujet.directeur_email %} | <i class="fas fa-envelope me-1"></i> {{ sujet.directeur_email }}{% endif %}
+                    </p>
+                </div>
+                {% if sujet.statut == 'en_cours' and session.role == 'etudiant' %}
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#soumettreChapitreModal">
+                        <i class="fas fa-plus me-1"></i> Soumettre nouveau chapitre
+                    </button>
+                {% endif %}
+            </div>
+            
+            <hr>
+            <div class="row">
+                <div class="col-md-6">
+                    <small class="text-muted">Domaine: <strong>{{ sujet.domaine_nom }}</strong></small>
+                </div>
+                <div class="col-md-6">
+                    <small class="text-muted">Date de soumission: <strong>{{ sujet.date_soumission.strftime('%d/%m/%Y') }}</strong></small>
+                </div>
+                {% if sujet.directeur_id %}
+                <div class="col-md-12 mt-2">
+                    <small class="text-muted">Directeur: <strong>{{ sujet.directeur_nom }}</strong></small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Indicateur du chapitre à soumettre (pour l'étudiant) -->
+    {% if session.role == 'etudiant' and sujet.statut == 'en_cours' %}
+    <div class="current-chapter-badge">
+        <i class="fas fa-book-open me-2"></i>
+        <strong>Chapitre à soumettre :</strong> 
+        Chapitre {{ sujet.chapitre_courant }} - 
+        {% if sujet.chapitre_courant == 1 %}{{ sujet.chapitre_1_titre|default('Introduction générale') }}
+        {% elif sujet.chapitre_courant == 2 %}{{ sujet.chapitre_2_titre|default('Revue de littérature') }}
+        {% elif sujet.chapitre_courant == 3 %}{{ sujet.chapitre_3_titre|default('Méthodologie') }}
+        {% elif sujet.chapitre_courant == 4 %}{{ sujet.chapitre_4_titre|default('Résultats et analyses') }}
+        {% elif sujet.chapitre_courant == 5 %}{{ sujet.chapitre_5_titre|default('Discussion et recommandations') }}
+        {% else %}Chapitre {{ sujet.chapitre_courant }}{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Grille des versions -->
+    <h4 class="fw-bold mb-3">
+        <i class="fas fa-code-branch text-primary me-2"></i>
+        Versions de travail
+    </h4>
+    
+    {% if versions %}
+        <div class="version-timeline">
+        {% for version in versions %}
+            <div class="version-item">
+                <div class="version-badge 
+                    {% if version.statut == 'valide' %}valide
+                    {% elif version.statut == 'soumis' %}soumis
+                    {% elif version.statut == 'corrige' %}corrige
+                    {% elif version.statut == 'approuve' %}approuve
+                    {% endif %}">
+                    {{ version.numero_version }}
+                </div>
+                <div class="card version-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">
+                                    {{ version.chapitre }} - {{ version.titre_chapitre }}
+                                    {% if version.est_version_finale %}
+                                        <span class="badge bg-success ms-2">VERSION FINALE</span>
+                                    {% endif %}
+                                </h6>
+                                <small class="text-muted">
+                                    Soumis le: {{ version.date_soumission.strftime('%d/%m/%Y à %H:%M') if version.date_soumission else 'Date inconnue' }}
+                                </small>
+                            </div>
+                            <div>
+                                <!-- BADGES DE STATUT AMÉLIORÉS -->
+                                {% if version.statut == 'soumis' %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-hourglass-half me-1"></i> ⏳ En attente de correction
+                                    </span>
+                                {% elif version.statut == 'corrige' %}
+                                    <span class="badge bg-info text-dark">
+                                        <i class="fas fa-edit me-1"></i> ✏️ À revoir / Corrections demandées
+                                    </span>
+                                {% elif version.statut == 'valide' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i> ✅ Validé
+                                    </span>
+                                {% elif version.statut == 'approuve' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check-double me-1"></i> 🏆 Approuvé (final)
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        {{ version.statut }}
+                                    </span>
+                                {% endif %}
+                                
+                                <!-- Taux de similarité -->
+                                {% if version.taux_similarite and version.taux_similarite > 0 %}
+                                    <span class="badge ms-1 {% if version.taux_similarite > 20 %}bg-danger{% else %}bg-secondary{% endif %}">
+                                        <i class="fas fa-chart-line"></i> 📊 {{ "%.1f"|format(version.taux_similarite) }}%
+                                    </span>
+                                {% endif %}
+                                
+                                <!-- Score IA -->
+                                {% if version.score_genai and version.score_genai > 0 %}
+                                    <span class="badge ms-1 {% if version.score_genai > 0.6 %}bg-danger{% else %}bg-secondary{% endif %}">
+                                        <i class="fas fa-robot"></i> 🤖 {{ "%.0f"|format(version.score_genai * 100) }}%
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        {% if version.contenu %}
+                            <div class="mt-2 small text-muted">
+                                {{ version.contenu[:300] }}{% if version.contenu|length > 300 %}...{% endif %}
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Télécharger le fichier -->
+                        {% if version.fichier_chemin %}
+                            {% set filename = version.fichier_chemin.replace('uploads/', '') %}
+                            <div class="mt-2">
+                                <a href="{{ url_for('telecharger_fichier', filename=filename) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-download me-1"></i> 📥 Télécharger le fichier
+                                </a>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Télécharger le rapport de similarité -->
+                        {% if version.rapport_similarite %}
+                            {% set rapport_filename = version.rapport_similarite.replace('uploads/', '') %}
+                            <div class="mt-2">
+                                <a href="{{ url_for('telecharger_fichier', filename=rapport_filename) }}" class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-file-pdf me-1"></i> 📊 Télécharger le rapport de similarité
+                                </a>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Fichier joint par le directeur -->
+                        {% if version.metadonnees and version.metadonnees.fichier_correction %}
+                            <div class="mt-2">
+                                <a href="{{ url_for('telecharger_fichier', filename=version.metadonnees.fichier_correction.replace('uploads/', '')) }}" class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-paperclip me-1"></i> 📎 Télécharger le fichier du directeur
+                                </a>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Commentaire du directeur -->
+                        {% if version.commentaire_directeur %}
+                            <div class="feedback-bubble">
+                                <small class="text-muted"><i class="fas fa-chalkboard-user me-1"></i> 💬 Commentaire du directeur:</small>
+                                <p class="mb-0 small">{{ version.commentaire_directeur }}</p>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Feedback historique -->
+                        {% if feedbacks and feedbacks[version.id] %}
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-link text-muted" onclick="toggleFeedback({{ version.id }})">
+                                    <i class="fas fa-comments me-1"></i> Voir l'historique des échanges
+                                </button>
+                                <div id="feedbackList{{ version.id }}" class="d-none mt-2">
+                                    {% for fb in feedbacks[version.id] %}
+                                        <div class="small p-2 mb-1 bg-light rounded">
+                                            <strong>{{ fb.emetteur_nom }}</strong> à <strong>{{ fb.destinataire_nom }}</strong>
+                                            <span class="text-muted">({{ fb.date_envoi.strftime('%d/%m/%Y %H:%M') }})</span>
+                                            <p class="mb-0 mt-1">{{ fb.message }}</p>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+        
+        <!-- Bouton soumission finale -->
+        {% if sujet.statut == 'en_cours' and session.role == 'etudiant' %}
+            <div class="soumettre-section mt-4 text-center">
+                <h5 class="mb-2">Prêt à soumettre votre version finale ?</h5>
+                <p class="mb-3 small opacity-75">Une vérification anti-plagiat complète sera effectuée automatiquement.</p>
+                <a href="{{ url_for('soumettre_final', sujet_id=sujet.id) }}" class="btn btn-light btn-lg">
+                    <i class="fas fa-upload me-2"></i> Soumettre la version finale
+                </a>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="alert alert-info text-center">
+            <i class="fas fa-info-circle fa-2x mb-2"></i>
+            <p>Aucune version de travail n'a encore été soumise.</p>
+            {% if sujet.statut == 'en_cours' and session.role == 'etudiant' %}
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#soumettreChapitreModal">
+                    <i class="fas fa-plus me-1"></i> Commencer votre premier chapitre
+                </button>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal: Soumettre un nouveau chapitre (AVEC SÉLECTION DU CHAPITRE) -->
+<div class="modal fade" id="soumettreChapitreModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-pen-fancy me-2"></i> Soumettre un chapitre</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('soumettre_version', sujet_id=sujet.id) }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Chapitre à soumettre :</strong> Chapitre {{ sujet.chapitre_courant }} - 
+                        {% if sujet.chapitre_courant == 1 %}{{ sujet.chapitre_1_titre|default('Introduction générale') }}
+                        {% elif sujet.chapitre_courant == 2 %}{{ sujet.chapitre_2_titre|default('Revue de littérature') }}
+                        {% elif sujet.chapitre_courant == 3 %}{{ sujet.chapitre_3_titre|default('Méthodologie') }}
+                        {% elif sujet.chapitre_courant == 4 %}{{ sujet.chapitre_4_titre|default('Résultats et analyses') }}
+                        {% elif sujet.chapitre_courant == 5 %}{{ sujet.chapitre_5_titre|default('Discussion et recommandations') }}
+                        {% endif %}
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Chapitre *</label>
+                            <!-- SELECT au lieu de INPUT pour éviter les erreurs -->
+                            <select name="chapitre" class="form-select" required>
+                                <option value="">-- Sélectionnez --</option>
+                                <option value="1">Chapitre 1 - Introduction générale</option>
+                                <option value="2">Chapitre 2 - Revue de littérature</option>
+                                <option value="3">Chapitre 3 - Méthodologie</option>
+                                <option value="4">Chapitre 4 - Résultats et analyses</option>
+                                <option value="5">Chapitre 5 - Discussion et recommandations</option>
+                            </select>
+                            <div class="form-text">⚠️ Vous ne pouvez soumettre que le chapitre {{ sujet.chapitre_courant }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Titre du chapitre *</label>
+                            <input type="text" name="titre_chapitre" class="form-control" 
+                                   placeholder="Titre du chapitre..." required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Contenu</label>
+                            <textarea name="contenu" rows="8" class="form-control" placeholder="Rédigez votre chapitre ici..."></textarea>
+                            <div class="form-text">Vous pouvez également joindre un fichier (PDF, DOC, DOCX)</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Fichier joint (optionnel)</label>
+                            <input type="file" name="fichier" class="form-control" accept=".pdf,.doc,.docx,.txt">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="confirmOriginalite" required>
+                            <label class="form-check-label" for="confirmOriginalite">
+                                Je certifie que ce travail est original et respecte les règles académiques.
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary" id="btnSoumettre">
+                        <i class="fas fa-paper-plane me-1"></i> Soumettre
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleFeedback(versionId) {
+        const el = document.getElementById(`feedbackList${versionId}`);
+        if (el.classList.contains('d-none')) {
+            el.classList.remove('d-none');
+        } else {
+            el.classList.add('d-none');
+        }
+    }
+    
+    // Validation du formulaire dans le modal
+    document.querySelector('#soumettreChapitreModal form')?.addEventListener('submit', function(e) {
+        const chapitreSelect = document.querySelector('select[name="chapitre"]');
+        const chapitreValue = parseInt(chapitreSelect.value);
+        const chapitreAttendu = {{ sujet.chapitre_courant }};
+        const confirmCheck = document.getElementById('confirmOriginalite');
+        
+        if (!chapitreSelect.value) {
+            alert('Veuillez sélectionner le numéro du chapitre');
+            e.preventDefault();
+            return false;
+        }
+        
+        if (chapitreValue !== chapitreAttendu) {
+            alert(`❌ Vous devez soumettre le chapitre ${chapitreAttendu} (Chapitre ${chapitreAttendu} seulement)`);
+            e.preventDefault();
+            return false;
+        }
+        
+        if (!confirmCheck.checked) {
+            alert('Veuillez confirmer que votre travail est original');
+            e.preventDefault();
+            return false;
+        }
+        
+        const btn = document.getElementById('btnSoumettre');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Envoi en cours...';
+        return true;
+    });
+    
+    // Auto-remplir le titre selon le chapitre sélectionné
+    document.querySelector('select[name="chapitre"]')?.addEventListener('change', function() {
+        const titreMapping = {
+            '1': 'Introduction générale',
+            '2': 'Revue de littérature',
+            '3': 'Méthodologie',
+            '4': 'Résultats et analyses',
+            '5': 'Discussion et recommandations'
+        };
+        const titreInput = document.querySelector('input[name="titre_chapitre"]');
+        if (this.value && titreMapping[this.value]) {
+            titreInput.value = titreMapping[this.value];
+        }
+    });
+</script>
+{% endblock %}

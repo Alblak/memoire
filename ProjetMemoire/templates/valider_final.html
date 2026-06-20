@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Valider la version finale - Directeur UAC{% endblock %}
+
+{% block extra_css %}
+<style>
+    .similarity-card {
+        border-radius: 12px;
+        transition: all 0.2s;
+    }
+    .similarity-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .score-high {
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+    .score-conforme {
+        color: #198754;
+    }
+    .score-non-conforme {
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="display-6 fw-bold">
+                <i class="fas fa-check-double text-success me-2"></i>
+                Validation de la version finale
+            </h1>
+            <p class="text-muted">{{ version.sujet_titre }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('dashboard_directeur') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Retour
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Colonne gauche: Informations -->
+        <div class="col-lg-5 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-info-circle me-2 text-primary"></i>
+                        Informations
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Étudiant:</strong><br>
+                        <i class="fas fa-user-graduate me-1 text-muted"></i> {{ version.etudiant_nom }}<br>
+                        <small class="text-muted">Email: {{ version.etudiant_email }}</small>
+                    </p>
+                    <hr>
+                    <p><strong>Sujet:</strong> {{ version.sujet_titre }}</p>
+                    <p><strong>Version finale soumise le:</strong><br>
+                        {{ version.date_soumission.strftime('%d/%m/%Y %H:%M') if version.date_soumission else 'Date inconnue' }}
+                    </p>
+                    
+                    <!-- Télécharger le manuscrit -->
+                    {% if version.fichier_chemin %}
+                        {% set filename = version.fichier_chemin.replace('uploads/', '') %}
+                        <div class="mt-3">
+                            <a href="{{ url_for('telecharger_fichier', filename=filename) }}" class="btn btn-outline-primary w-100">
+                                <i class="fas fa-download me-2"></i> Télécharger le manuscrit
+                            </a>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Télécharger le rapport de similarité -->
+                    {% if version.rapport_similarite %}
+                        {% set rapport_filename = version.rapport_similarite.replace('uploads/', '') %}
+                        <div class="mt-2">
+                            <a href="{{ url_for('telecharger_fichier', filename=rapport_filename) }}" class="btn btn-outline-danger w-100">
+                                <i class="fas fa-file-pdf me-2"></i> Télécharger le rapport de similarité
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Colonne droite: Résultats anti-plagiat et validation -->
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-chart-line me-2 text-primary"></i>
+                        Résultats de l'analyse
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Score similarité -->
+                    <div class="similarity-card card mb-3">
+                        <div class="card-body text-center">
+                            <h6 class="text-muted mb-2">Taux de similarité</h6>
+                            {% set est_conforme_sim = version.taux_similarite <= config.SEUIL_SIMILARITE %}
+                            <div class="score-high {% if est_conforme_sim %}score-conforme{% else %}score-non-conforme{% endif %}">
+                                {{ "%.1f"|format(version.taux_similarite) if version.taux_similarite else '0.0' }}%
+                            </div>
+                            <div class="mt-2">
+                                {% if est_conforme_sim %}
+                                    <span class="badge bg-success">✓ CONFORME</span>
+                                    <small class="text-muted d-block mt-1">
+                                        Seuil autorisé: {{ config.SEUIL_SIMILARITE }}%
+                                    </small>
+                                {% else %}
+                                    <span class="badge bg-danger">✗ NON CONFORME</span>
+                                    <small class="text-muted d-block mt-1">
+                                        Dépasse le seuil autorisé de {{ config.SEUIL_SIMILARITE }}%
+                                    </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Score détection IA -->
+                    <div class="similarity-card card">
+                        <div class="card-body text-center">
+                            <h6 class="text-muted mb-2">Détection de contenu IA</h6>
+                            {% set est_conforme_ia = version.score_genai <= config.SEUIL_GENAI %}
+                            <div class="score-high {% if est_conforme_ia %}score-conforme{% else %}score-non-conforme{% endif %}">
+                                {{ "%.0f"|format(version.score_genai * 100) if version.score_genai else '0' }}%
+                            </div>
+                            <div class="mt-2">
+                                {% if est_conforme_ia %}
+                                    <span class="badge bg-success">✓ CONFORME</span>
+                                {% else %}
+                                    <span class="badge bg-danger">✗ NON CONFORME</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulaire de validation -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-gavel me-2 text-primary"></i>
+                        Décision du directeur
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Commentaire (optionnel)</label>
+                            <textarea name="commentaire" class="form-control" rows="4" 
+                                      placeholder="Félicitations à l'étudiant ou demandez des corrections..."></textarea>
+                            <div class="form-text">Ce commentaire sera visible par l'étudiant</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                <i class="fas fa-paperclip me-1"></i> Fichier joint (optionnel)
+                            </label>
+                            <input type="file" name="fichier_joint" class="form-control" accept=".pdf,.doc,.docx,.txt,.zip">
+                            <div class="form-text">
+                                Vous pouvez joindre un fichier corrigé, des annotations ou un rapport complémentaire
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="d-flex gap-3 justify-content-end">
+                            <a href="{{ url_for('dashboard_directeur') }}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i> Annuler
+                            </a>
+                            <button type="submit" name="action" value="corriger" class="btn btn-warning">
+                                <i class="fas fa-undo me-1"></i> Demander corrections
+                            </button>
+                            <button type="submit" name="action" value="approuver" class="btn btn-success">
+                                <i class="fas fa-check-double me-1"></i> Approuver le mémoire
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,645 @@
+{% extends "base.html" %}
+
+{% block title %}Assistant Étudiant - UAC{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chatbot-container {
+        display: flex;
+        flex-direction: column;
+        height: 90vh;
+        max-width: 900px;
+        margin: 20px auto;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 5px 30px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    /* En-tête du chatbot */
+    .chatbot-header {
+        background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+        color: white;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+    }
+
+    .chatbot-header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .chatbot-header .badge {
+        background: rgba(255,255,255,0.3);
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+    }
+
+    /* Zone de messages */
+    .chatbot-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        background: #f8f9fa;
+    }
+
+    .message {
+        display: flex;
+        animation: slideIn 0.3s ease;
+        gap: 10px;
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .message.user {
+        justify-content: flex-end;
+    }
+
+    .message.assistant {
+        justify-content: flex-start;
+    }
+
+    .message-bubble {
+        max-width: 70%;
+        padding: 12px 15px;
+        border-radius: 12px;
+        word-wrap: break-word;
+        line-height: 1.5;
+    }
+
+    .message.user .message-bubble {
+        background: #0d6efd;
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant .message-bubble {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-bottom-left-radius: 4px;
+        color: #333;
+    }
+
+    .message-avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 1.2rem;
+    }
+
+    .message.user .message-avatar {
+        background: #e8f4fd;
+        color: #0d6efd;
+    }
+
+    .message.assistant .message-avatar {
+        background: #d1ecf1;
+        color: #0dcaf0;
+    }
+
+    /* Suggestions de questions */
+    .suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .suggestion-btn {
+        background: #e8f4fd;
+        border: 1px solid #0d6efd;
+        color: #0d6efd;
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .suggestion-btn:hover {
+        background: #0d6efd;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    /* Catégorie badge */
+    .category-badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        margin-bottom: 5px;
+        font-weight: 500;
+    }
+
+    .category-administrative {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+
+    .category-methodologique {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+
+    .category-redaction {
+        background: #fce4ec;
+        color: #c2185b;
+    }
+
+    .category-documentaire {
+        background: #e8f5e9;
+        color: #388e3c;
+    }
+
+    /* Zone d'entrée */
+    .chatbot-footer {
+        border-top: 1px solid #dee2e6;
+        padding: 15px;
+        display: flex;
+        gap: 10px;
+        background: white;
+        flex-shrink: 0;
+    }
+
+    .input-group {
+        flex: 1;
+        display: flex;
+        gap: 5px;
+    }
+
+    .message-input {
+        flex: 1;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 10px 15px;
+        font-size: 0.95rem;
+        font-family: 'Poppins', sans-serif;
+        resize: none;
+        max-height: 100px;
+    }
+
+    .message-input:focus {
+        outline: none;
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+    }
+
+    .btn-send {
+        background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
+        color: white;
+        border: none;
+        padding: 10px 25px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .btn-send:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(13, 110, 253, 0.3);
+    }
+
+    .btn-send:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Sidebars pour catégories */
+    .chatbot-sidebar {
+        display: none;
+        width: 280px;
+        border-right: 1px solid #dee2e6;
+        padding: 20px;
+        background: #f8f9fa;
+        overflow-y: auto;
+    }
+
+    .chatbot-sidebar.show {
+        display: block;
+    }
+
+    .category-section {
+        margin-bottom: 25px;
+    }
+
+    .category-section h6 {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .category-section ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .category-section li {
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.9rem;
+        color: #666;
+        border-left: 3px solid transparent;
+    }
+
+    .category-section li:hover {
+        background: white;
+        color: #0d6efd;
+        border-left-color: #0d6efd;
+    }
+
+    /* Loading animation */
+    .typing-indicator {
+        display: flex;
+        gap: 4px;
+        padding: 10px 15px;
+    }
+
+    .typing-indicator span {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #0dcaf0;
+        animation: typing 1.4s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .typing-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+        0%, 60%, 100% { opacity: 0.5; }
+        30% { opacity: 1; }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .chatbot-container {
+            height: 85vh;
+            margin: 10px;
+            border-radius: 10px;
+        }
+
+        .message-bubble {
+            max-width: 85%;
+        }
+
+        .chatbot-sidebar {
+            display: none;
+        }
+
+        .chatbot-header h1 {
+            font-size: 1.2rem;
+        }
+    }
+
+    /* Code et formatage */
+    .message-bubble code {
+        background: rgba(0,0,0,0.1);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+
+    .message-bubble strong {
+        font-weight: 600;
+    }
+
+    .message-bubble em {
+        font-style: italic;
+    }
+
+    /* Listes */
+    .message-bubble ul, 
+    .message-bubble ol {
+        margin: 10px 0;
+        padding-left: 20px;
+    }
+
+    .message-bubble li {
+        margin: 5px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chatbot-container">
+    <!-- En-tête -->
+    <div class="chatbot-header">
+        <div>
+            <h1>
+                <i class="fas fa-robot"></i>
+                Assistant Étudiant UAC
+            </h1>
+        </div>
+        <div>
+            <span class="badge">
+                <i class="fas fa-circle text-success"></i> Disponible
+            </span>
+        </div>
+    </div>
+
+    <div style="display: flex; flex: 1; overflow: hidden;">
+        <!-- Zone de messages -->
+        <div class="chatbot-messages" id="messagesContainer">
+            <div class="message assistant">
+                <div class="message-avatar">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div>
+                    <div class="message-bubble">
+                        <strong>Bienvenue! 👋</strong><br><br>
+                        Je suis votre assistant virtuel pour vous aider dans votre parcours de mémoire. 
+                        Je peux vous fournir des informations sur:
+                        <div style="margin-top: 10px;">
+                            <div class="category-badge category-administrative">
+                                📋 Informations Administratives
+                            </div>
+                            <div class="category-badge category-methodologique" style="margin-left: 5px;">
+                                📚 Conseils Méthodologiques
+                            </div>
+                            <div class="category-badge category-redaction" style="margin-left: 5px;">
+                                ✍️ Assistance à la Rédaction
+                            </div>
+                            <div class="category-badge category-documentaire" style="margin-left: 5px;">
+                                🔍 Recherche Documentaire
+                            </div>
+                        </div>
+                        <div class="suggestions" id="initialSuggestions">
+                            <button class="suggestion-btn" onclick="sendMessage('Quel est le seuil de plagiat?')">
+                                Seuil de plagiat?
+                            </button>
+                            <button class="suggestion-btn" onclick="sendMessage('Comment structurer mon mémoire?')">
+                                Structure mémoire?
+                            </button>
+                            <button class="suggestion-btn" onclick="sendMessage('Comment citer les sources?')">
+                                Citation sources?
+                            </button>
+                            <button class="suggestion-btn" onclick="sendMessage('Où trouver des sources?')">
+                                Trouver sources?
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zone d'entrée -->
+    <div class="chatbot-footer">
+        <div class="input-group">
+            <textarea 
+                class="message-input" 
+                id="messageInput" 
+                placeholder="Posez votre question..." 
+                rows="1"
+                onkeydown="handleKeyPress(event)"></textarea>
+            <button class="btn-send" id="sendBtn" onclick="sendMessage()">
+                <i class="fas fa-paper-plane"></i>
+                Envoyer
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const messagesContainer = document.getElementById('messagesContainer');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    // Auto-resize textarea
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+    });
+
+    // Gestion de l'entrée clavier
+    function handleKeyPress(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    }
+
+    // Envoyer un message
+    function sendMessage(messageText = null) {
+        const message = messageText || messageInput.value.trim();
+        
+        if (!message) return;
+
+        // Afficher le message utilisateur
+        addMessage(message, 'user');
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+        sendBtn.disabled = true;
+
+        // Afficher indicateur de saisie
+        showTypingIndicator();
+
+        // Envoyer au serveur
+        fetch('/api/chatbot/message', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
+            body: JSON.stringify({ message: message })
+        })
+        .then(response => response.json())
+        .then(data => {
+            removeTypingIndicator();
+            
+            if (data.error) {
+                addMessage("Désolé, j'ai rencontré une erreur. Veuillez réessayer.", 'assistant');
+            } else {
+                // Formater la réponse
+                let formattedResponse = data.text;
+                
+                // Remplacer les **texte** par du bold
+                formattedResponse = formattedResponse.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                
+                // Remplacer les \n par des <br>
+                formattedResponse = formattedResponse.replace(/\n/g, '<br>');
+                
+                addMessageHTML(formattedResponse, 'assistant', data.category);
+                
+                // Afficher les suggestions si disponibles
+                if (data.suggestions && data.suggestions.length > 0) {
+                    setTimeout(() => showSuggestions(data.suggestions), 500);
+                }
+            }
+            sendBtn.disabled = false;
+        })
+        .catch(error => {
+            removeTypingIndicator();
+            console.error('Erreur:', error);
+            addMessage("Une erreur s'est produite. Veuillez réessayer.", 'assistant');
+            sendBtn.disabled = false;
+        });
+    }
+
+    // Ajouter un message simple
+    function addMessage(text, sender) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.innerHTML = sender === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        bubble.textContent = text;
+        
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(bubble);
+        
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // Ajouter un message avec HTML et catégorie
+    function addMessageHTML(html, sender, category = null) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.innerHTML = sender === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+        
+        const container = document.createElement('div');
+        
+        if (category && sender === 'assistant') {
+            const categoryBadge = document.createElement('div');
+            categoryBadge.className = `category-badge category-${category}`;
+            
+            const icons = {
+                'administrative': '📋 Info Administrative',
+                'methodologique': '📚 Conseils Méthodologiques',
+                'redaction': '✍️ Assistance Rédaction',
+                'documentaire': '🔍 Recherche Documentaire'
+            };
+            
+            categoryBadge.textContent = icons[category] || category;
+            container.appendChild(categoryBadge);
+        }
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        bubble.innerHTML = html;
+        
+        container.appendChild(bubble);
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(container);
+        
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // Afficher les suggestions
+    function showSuggestions(suggestions) {
+        if (!suggestions || suggestions.length === 0) return;
+        
+        const lastMessage = messagesContainer.lastElementChild;
+        const suggestionsDiv = document.createElement('div');
+        suggestionsDiv.className = 'suggestions';
+        
+        suggestions.forEach(suggestion => {
+            const btn = document.createElement('button');
+            btn.className = 'suggestion-btn';
+            btn.textContent = suggestion;
+            btn.onclick = () => sendMessage(suggestion);
+            suggestionsDiv.appendChild(btn);
+        });
+        
+        if (lastMessage && lastMessage.querySelector('.message-bubble')) {
+            lastMessage.querySelector('.message-bubble').appendChild(suggestionsDiv);
+        }
+    }
+
+    // Indicateur de saisie
+    function showTypingIndicator() {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message assistant';
+        messageDiv.id = 'typingIndicator';
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.innerHTML = '<i class="fas fa-robot"></i>';
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        bubble.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+        
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(bubble);
+        
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+        const indicator = document.getElementById('typingIndicator');
+        if (indicator) indicator.remove();
+    }
+
+    // Charger l'historique au chargement
+    window.addEventListener('load', function() {
+        fetch('/api/chatbot/history')
+            .then(response => response.json())
+            .then(data => {
+                if (data.history && data.history.length > 0) {
+                    // Nettoyer les messages initiaux
+                    messagesContainer.innerHTML = '';
+                    
+                    // Charger l'historique
+                    data.history.forEach(entry => {
+                        addMessage(entry.message, 'user');
+                        addMessageHTML(entry.response.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'), 'assistant', entry.category);
+                    });
+                }
+            });
+    });
+
+    // Focus sur input au chargement
+    messageInput.focus();
+</script>
+{% endblock %}

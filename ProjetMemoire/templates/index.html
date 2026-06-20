@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Accueil - UAC Gestion des Mémoires{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 text-center">
+            <div class="hero-section py-5">
+                <i class="fas fa-graduation-cap fa-4x text-primary mb-3"></i>
+                <h1 class="display-4 fw-bold">Bienvenue sur la Plateforme</h1>
+                <h2 class="h3 text-primary mb-4">Gestion des Mémoires et Thèses</h2>
+                <p class="lead mb-4">
+                    Université de l'Assomption au Congo (UAC)<br>
+                    Système intégré de soumission, suivi et validation des travaux académiques
+                </p>
+                <div class="mt-4">
+                    <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-sign-in-alt me-2"></i> Se connecter
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-5 g-4">
+        <div class="col-md-4">
+            <div class="card h-100 text-center shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-file-alt fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Soumission de sujets</h5>
+                    <p class="card-text">Les étudiants finalistes soumettent leurs sujets et concept papers en ligne.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 text-center shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-chalkboard-user fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Encadrement personnalisé</h5>
+                    <p class="card-text">Suivi des travaux entre étudiants et directeurs avec historique complet.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 text-center shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-shield-alt fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Anti-plagiat intégré</h5>
+                    <p class="card-text">Vérification automatique des taux de similarité et détection d'IA.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

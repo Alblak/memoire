@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+
+{% block title %}Soumettre un sujet - uac{% endblock %}
+
+{% block extra_css %}
+<style>
+    .step-indicator {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 2rem;
+        position: relative;
+    }
+    .step {
+        flex: 1;
+        text-align: center;
+        position: relative;
+        z-index: 1;
+    }
+    .step:not(:last-child):before {
+        content: '';
+        position: absolute;
+        top: 25px;
+        left: 50%;
+        width: 100%;
+        height: 3px;
+        background: #dee2e6;
+        z-index: -1;
+    }
+    .step.active:before { background: #0d6efd; }
+    .step.completed:before { background: #198754; }
+    .step .step-circle {
+        width: 50px;
+        height: 50px;
+        background: #dee2e6;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.2rem;
+        margin-bottom: 0.5rem;
+    }
+    .step.active .step-circle { background: #0d6efd; color: white; }
+    .step.completed .step-circle { background: #198754; color: white; }
+    .step-label { font-size: 0.85rem; color: #6c757d; }
+    .step.active .step-label { color: #0d6efd; font-weight: bold; }
+    .step.completed .step-label { color: #198754; }
+    .upload-area {
+        border: 2px dashed #ccc;
+        border-radius: 10px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    .upload-area:hover, .upload-area.drag-over {
+        border-color: #0d6efd;
+        background: #f0f7ff;
+    }
+    .file-info { font-size: 0.85rem; margin-top: 0.5rem; }
+    .preview-card { border-left: 4px solid #198754; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- En-tête -->
+            <div class="mb-4">
+                <h1 class="display-6 fw-bold">
+                    <i class="fas fa-paper-plane text-primary me-2"></i>
+                    Soumettre un sujet de mémoire
+                </h1>
+                <p class="text-muted">
+                    Remplissez le formulaire ci-dessous pour soumettre votre sujet. 
+                    Le doyen l'examinera et vous attribuera un directeur.
+                </p>
+            </div>
+
+            <!-- Indicateur d'étapes -->
+            <div class="step-indicator">
+                <div class="step active">
+                    <div class="step-circle">1</div>
+                    <div class="step-label">Informations générales</div>
+                </div>
+                <div class="step">
+                    <div class="step-circle">2</div>
+                    <div class="step-label">Concept paper</div>
+                </div>
+                <div class="step">
+                    <div class="step-circle">3</div>
+                    <div class="step-label">Validation</div>
+                </div>
+            </div>
+
+            <!-- Formulaire -->
+            <form method="POST" enctype="multipart/form-data" id="sujetForm">
+                <div class="card shadow-sm">
+                    <div class="card-body p-4">
+                        <!-- Étape 1: Informations générales -->
+                        <div id="step1">
+                            <h5 class="mb-3"><i class="fas fa-info-circle me-2 text-primary"></i>Informations du sujet</h5>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Titre du mémoire <span class="text-danger">*</span></label>
+                                    <input type="text" name="titre" class="form-control" required 
+                                           placeholder="Ex: Impact des TIC sur l'éducation en RDC" maxlength="255">
+                                    <div class="form-text">Soyez précis et concis (max 255 caractères)</div>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Domaine d'étude <span class="text-danger">*</span></label>
+                                    <select name="domaine_id" class="form-select" required>
+                                        <option value="">-- Sélectionnez un domaine --</option>
+                                        {% for domaine in domaines %}
+                                            <option value="{{ domaine.id }}">{{ domaine.code }} - {{ domaine.nom }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <!-- ANNÉE ACADÉMIQUE (format 2025/2026) -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Année académique <span class="text-danger">*</span></label>
+                                    <select name="annee_academique" class="form-select" required>
+                                        <option value="">-- Sélectionnez --</option>
+                                        <option value="2024/2025">2024/2025</option>
+                                        <option value="2025/2026" selected>2025/2026</option>
+                                        <option value="2026/2027">2026/2027</option>
+                                        <option value="2027/2028">2027/2028</option>
+                                    </select>
+                                    <div class="form-text">Exemple: 2025/2026 (année de soutenance prévue)</div>
+                                </div>
+                                
+                                <!-- NIVEAU D'ÉTUDE (L3, M1, M2) -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Niveau d'étude <span class="text-danger">*</span></label>
+                                    <select name="niveau_etude" class="form-select" required>
+                                        <option value="">-- Sélectionnez --</option>
+                                        <option value="L3">Licence 3 (L3)</option>
+                                        <option value="M1">Master 1 (M1)</option>
+                                        <option value="M2">Master 2 (M2)</option>
+                                    </select>
+                                    <div class="form-text">L3 pour Licence, M1/M2 pour Master</div>
+                                </div>
+                                
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Mots-clés</label>
+                                    <input type="text" name="mots_cles" class="form-control" 
+                                           placeholder="Ex: éducation, TIC, RDC, numérique">
+                                    <div class="form-text">Séparez par des virgules (optionnel)</div>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Description détaillée <span class="text-danger">*</span></label>
+                                    <textarea name="description" rows="6" class="form-control" required
+                                              placeholder="Décrivez votre sujet, la problématique, les objectifs et la méthodologie envisagée..."></textarea>
+                                    <div class="form-text">Minimum 200 caractères. Soyez clair et structuré.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Étape 2: Concept paper -->
+                        <div id="step2" style="display: none;">
+                            <h5 class="mb-3"><i class="fas fa-file-upload me-2 text-primary"></i>Concept paper</h5>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Le concept paper doit présenter clairement:
+                                <ul class="mb-0 mt-2">
+                                    <li>La problématique et la question de recherche</li>
+                                    <li>Les objectifs (général et spécifiques)</li>
+                                    <li>La méthodologie proposée</li>
+                                    <li>La structure prévisionnelle du mémoire</li>
+                                    <li>Une bibliographie indicative</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="upload-area" id="uploadArea">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                <p class="mb-1"><strong>Déposez votre concept paper ici</strong></p>
+                                <p class="text-muted small">ou cliquez pour parcourir</p>
+                                <input type="file" name="concept_paper" id="conceptFile" class="d-none" accept=".pdf,.doc,.docx,.txt">
+                                <div id="fileInfo" class="file-info text-muted"></div>
+                            </div>
+                            <div class="text-muted small mt-2">
+                                <i class="fas fa-file-alt me-1"></i> Formats acceptés: PDF, DOC, DOCX, TXT (max 20MB)
+                            </div>
+                        </div>
+
+                        <!-- Étape 3: Validation et récapitulatif -->
+                        <div id="step3" style="display: none;">
+                            <h5 class="mb-3"><i class="fas fa-check-circle me-2 text-success"></i>Vérification et soumission</h5>
+                            <div class="preview-card card bg-light">
+                                <div class="card-body">
+                                    <h6 class="fw-bold">Récapitulatif de votre soumission</h6>
+                                    <div id="previewContent"></div>
+                                </div>
+                            </div>
+                            <div class="form-check mt-3">
+                                <input class="form-check-input" type="checkbox" id="confirmCheck" required>
+                                <label class="form-check-label" for="confirmCheck">
+                                    Je certifie que ce travail est original et personnel.
+                                    Je comprends que tout plagiat sera sanctionné conformément au règlement académique.
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white d-flex justify-content-between p-3">
+                        <button type="button" id="prevBtn" class="btn btn-secondary" style="display: none;">
+                            <i class="fas fa-arrow-left me-1"></i> Précédent
+                        </button>
+                        <button type="button" id="nextBtn" class="btn btn-primary">
+                            Suivant <i class="fas fa-arrow-right ms-1"></i>
+                        </button>
+                        <button type="submit" id="submitBtn" class="btn btn-success" style="display: none;">
+                            <i class="fas fa-paper-plane me-1"></i> Soumettre le sujet
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Avertissements -->
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-shield-alt me-2"></i>
+                <strong>Politique anti-plagiat:</strong> Votre travail sera vérifié automatiquement.
+                Le seuil de similarité maximum autorisé est de {{ session.seuil_similarite or 20 }}%.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentStep = 1;
+    const totalSteps = 3;
+    
+    // Gestion des étapes
+    function showStep(step) {
+        $('#step1, #step2, #step3').hide();
+        $(`#step${step}`).show();
+        
+        // Afficher/masquer les boutons
+        $('#prevBtn').toggle(step > 1);
+        $('#nextBtn').toggle(step < totalSteps);
+        $('#submitBtn').toggle(step === totalSteps);
+        
+        // Mettre à jour l'indicateur
+        $('.step').removeClass('active completed');
+        for (let i = 1; i <= totalSteps; i++) {
+            if (i < step) $(`.step:nth-child(${i})`).addClass('completed');
+            else if (i === step) $(`.step:nth-child(${i})`).addClass('active');
+        }
+        
+        // Si étape 2, vérifier fichier
+        if (step === 2) {
+            checkFileUpload();
+        }
+        
+        // Si étape 3, générer aperçu
+        if (step === 3) {
+            generatePreview();
+        }
+    }
+    
+    // Vérifier si fichier uploadé
+    function checkFileUpload() {
+        const fileInput = $('#conceptFile')[0];
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            const fileSize = (file.size / 1024 / 1024).toFixed(2);
+            $('#fileInfo').html(`<i class="fas fa-check-circle text-success"></i> Fichier sélectionné: ${file.name} (${fileSize} MB)`);
+            $('#nextBtn').prop('disabled', false);
+        } else {
+            $('#fileInfo').html('<i class="fas fa-exclamation-triangle text-warning"></i> Aucun fichier sélectionné');
+            $('#nextBtn').prop('disabled', true);
+        }
+    }
+    
+    // Générer l'aperçu
+    function generatePreview() {
+        const titre = $('input[name="titre"]').val();
+        const domaine = $('select[name="domaine_id"] option:selected').text();
+        const anneeAcademique = $('select[name="annee_academique"] option:selected').text();
+        const niveauEtude = $('select[name="niveau_etude"] option:selected').text();
+        const description = $('textarea[name="description"]').val();
+        const motsCles = $('input[name="mots_cles"]').val();
+        const file = $('#conceptFile')[0].files[0];
+        
+        let html = `
+            <table class="table table-sm">
+                <tr><th style="width: 40%">Titre:</th><td>${escapeHtml(titre)}</td></tr>
+                <tr><th>Domaine:</th><td>${escapeHtml(domaine)}</td></tr>
+                <tr><th>Année académique:</th><td>${escapeHtml(anneeAcademique)}</td></tr>
+                <tr><th>Niveau d'étude:</th><td>${escapeHtml(niveauEtude)}</td></tr>
+                <tr><th>Mots-clés:</th><td>${escapeHtml(motsCles || 'Non renseignés')}</td></tr>
+                <tr><th>Description:</th><td>${escapeHtml(description.substring(0, 200))}${description.length > 200 ? '...' : ''}</td></tr>
+                <tr><th>Concept paper:</th><td>${file ? file.name : 'Aucun'}</td></tr>
+            </table>
+        `;
+        $('#previewContent').html(html);
+    }
+    
+    // Échappement HTML
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    
+    // Upload avec drag & drop
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('conceptFile');
+    
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+    });
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('drag-over');
+    });
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length) {
+            fileInput.files = files;
+            checkFileUpload();
+        }
+    });
+    
+    fileInput.addEventListener('change', checkFileUpload);
+    
+    // Navigation - Validation étape 1
+    $('#nextBtn').click(function() {
+        // Validation étape 1
+        if (currentStep === 1) {
+            const titre = $('input[name="titre"]').val().trim();
+            const domaine = $('select[name="domaine_id"]').val();
+            const anneeAcademique = $('select[name="annee_academique"]').val();
+            const niveauEtude = $('select[name="niveau_etude"]').val();
+            const description = $('textarea[name="description"]').val().trim();
+            
+            if (!titre) { alert('Veuillez saisir un titre'); return; }
+            if (!domaine) { alert('Veuillez sélectionner un domaine'); return; }
+            if (!anneeAcademique) { alert('Veuillez sélectionner l\'année académique'); return; }
+            if (!niveauEtude) { alert('Veuillez sélectionner le niveau d\'étude'); return; }
+            if (!description || description.length < 200) { 
+                alert('La description doit contenir au moins 200 caractères'); 
+                return; 
+            }
+        }
+        
+        if (currentStep < totalSteps) {
+            currentStep++;
+            showStep(currentStep);
+        }
+    });
+    
+    $('#prevBtn').click(function() {
+        if (currentStep > 1) {
+            currentStep--;
+            showStep(currentStep);
+        }
+    });
+    
+    // Soumission AJAX
+    $('#sujetForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        if (!$('#confirmCheck').is(':checked')) {
+            alert('Veuillez confirmer que votre travail est original');
+            return;
+        }
+        
+        const formData = new FormData(this);
+        
+        $.ajax({
+            url: '',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            beforeSend: function() {
+                $('#submitBtn').html('<i class="fas fa-spinner fa-spin me-1"></i> Soumission en cours...').prop('disabled', true);
+            },
+            success: function(response) {
+                window.location.href = response.redirect || "{{ url_for('dashboard_etudiant') }}";
+            },
+            error: function(xhr) {
+                let errorMsg = 'Erreur lors de la soumission. Veuillez réessayer.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                alert(errorMsg);
+                $('#submitBtn').html('<i class="fas fa-paper-plane me-1"></i> Soumettre le sujet').prop('disabled', false);
+            }
+        });
+    });
+    
+    // Initialisation
+    showStep(1);
+</script>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Page non trouvée - UAC{% endblock %}
+
+{% block content %}
+<div class="container text-center py-5">
+    <i class="fas fa-search fa-4x text-muted mb-4"></i>
+    <h1 class="display-1 fw-bold text-muted">404</h1>
+    <h2 class="h4 mb-3">Page non trouvée</h2>
+    <p class="text-muted mb-4">La page que vous recherchez n'existe pas ou a été déplacée.</p>
+    <a href="{{ url_for('index') }}" class="btn btn-primary">
+        <i class="fas fa-home me-2"></i> Retour à l'accueil
+    </a>
+</div>
+{% endblock %}

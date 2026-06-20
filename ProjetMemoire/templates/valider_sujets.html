@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block title %}Validation des sujets - Doyen UAC{% endblock %}
+
+{% block extra_css %}
+<style>
+    .selected-director {
+        background-color: #e7f5e8;
+    }
+    .director-select {
+        min-width: 220px;
+    }
+    .motif-input {
+        display: none;
+    }
+    .action-buttons {
+        gap: 8px;
+    }
+    .sujet-card {
+        transition: all 0.2s;
+        margin-bottom: 16px;
+    }
+    .sujet-card.expanded {
+        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    }
+    .detail-content {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 15px;
+    }
+    .director-info {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    .director-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="display-6 fw-bold">
+                <i class="fas fa-check-double text-primary me-2"></i>
+                Validation des sujets
+            </h1>
+            <p class="text-muted">Examinez et attribuez les sujets aux directeurs</p>
+        </div>
+        <div class="d-flex gap-2">
+            <div class="input-group" style="width: 250px;">
+                <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+                <input type="text" id="searchSujet" class="form-control" placeholder="Rechercher...">
+            </div>
+            <select id="filterDomaine" class="form-select" style="width: 150px;">
+                <option value="">Tous domaines</option>
+                {% for domaine in domaines %}
+                    <option value="{{ domaine.nom }}">{{ domaine.code }} - {{ domaine.nom }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    {% if sujets %}
+        {% for sujet in sujets %}
+            <div class="card sujet-card shadow-sm" data-domaine="{{ sujet.domaine_nom }}" data-titre="{{ sujet.titre|lower }}" data-etudiant="{{ sujet.etudiant_nom|lower }}">
+                <div class="card-body">
+                    <div class="row align-items-start">
+                        <div class="col-md-7">
+                            <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                                <span class="badge bg-secondary">{{ sujet.domaine_code }} - {{ sujet.domaine_nom }}</span>
+                                <span class="badge bg-warning text-dark">
+                                    <i class="fas fa-clock me-1"></i> Soumis le {{ sujet.date_soumission.strftime('%d/%m/%Y') }}
+                                </span>
+                                {% if sujet.nb_versions is defined and sujet.nb_versions > 0 %}
+                                    <span class="badge bg-info">{{ sujet.nb_versions }} versions</span>
+                                {% endif %}
+                            </div>
+                            <h5 class="card-title">{{ sujet.titre }}</h5>
+                            <p class="card-text text-muted small mb-2">
+                                <i class="fas fa-user-graduate me-1"></i> {{ sujet.etudiant_nom }} ({{ sujet.matricule }})
+                                <span class="mx-2">|</span>
+                                <i class="fas fa-envelope me-1"></i> {{ sujet.etudiant_email }}
+                            </p>
+                            <p class="small">{{ sujet.description[:200] }}{% if sujet.description|length > 200 %}...{% endif %}</p>
+                            
+                            <button class="btn btn-sm btn-outline-secondary" onclick="toggleDetails({{ sujet.id }})">
+                                <i class="fas fa-chevron-down" id="expandIcon{{ sujet.id }}"></i> Afficher plus
+                            </button>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="border rounded p-3 bg-light">
+                                <label class="form-label fw-semibold mb-2">
+                                    <i class="fas fa-chalkboard-user me-1"></i> Attribuer à:
+                                </label>
+                                <select class="form-select form-select-sm director-select mb-3" id="directeur_{{ sujet.id }}">
+                                    <option value="">-- Sélectionnez un directeur --</option>
+                                    {% for directeur in directeurs %}
+                                        <option value="{{ directeur.id }}" 
+                                                data-charge="{{ directeur.charge_actuelle|default(0) }}"
+                                                data-email="{{ directeur.email }}">
+                                            {{ directeur.nom_complet }}
+                                            {% if directeur.charge_actuelle is defined %}
+                                                ({{ directeur.charge_actuelle }} encours)
+                                            {% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                
+                                <!-- Affichage des infos du directeur sélectionné -->
+                                <div id="directeurInfo_{{ sujet.id }}" class="director-info small text-muted mb-2" style="display: none;">
+                                    <i class="fas fa-info-circle"></i> 
+                                    <span id="directeurEmail_{{ sujet.id }}"></span>
+                                </div>
+                                
+                                <div class="action-buttons d-flex gap-2">
+                                    <button class="btn btn-sm btn-success flex-fill" onclick="approuverSujet({{ sujet.id }})">
+                                        <i class="fas fa-check me-1"></i> Approuver
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="rejeterSujet({{ sujet.id }})">
+                                        <i class="fas fa-times me-1"></i> Rejeter
+                                    </button>
+                                </div>
+                                
+                                <div id="motifDiv_{{ sujet.id }}" class="motif-input mt-3">
+                                    <label class="form-label small">Motif du rejet:</label>
+                                    <textarea class="form-control form-control-sm" id="motif_{{ sujet.id }}" rows="2" placeholder="Expliquez le motif du rejet..."></textarea>
+                                    <div class="mt-2">
+                                        <button class="btn btn-sm btn-danger" onclick="confirmerRejet({{ sujet.id }})">Confirmer rejet</button>
+                                        <button class="btn btn-sm btn-secondary" onclick="annulerRejet({{ sujet.id }})">Annuler</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="details_{{ sujet.id }}" class="card-footer p-0" style="display: none;">
+                    <div class="detail-content">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="fw-bold">Description complète</h6>
+                                <p class="small">{{ sujet.description }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="fw-bold">Concept paper</h6>
+                                {% if sujet.fichier_concept %}
+                                    <a href="#" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-download me-1"></i> Télécharger
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted small">Aucun fichier</span>
+                                {% endif %}
+                                <hr>
+                                <h6 class="fw-bold">Historique</h6>
+                                <ul class="small">
+                                    <li>Soumission: {{ sujet.date_soumission.strftime('%d/%m/%Y %H:%M') if sujet.date_soumission else 'Date inconnue' }}</li>
+                                    {% if sujet.nb_versions is defined and sujet.nb_versions > 0 %}
+                                        <li>{{ sujet.nb_versions }} version(s) de travail</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-success text-center">
+            <i class="fas fa-check-circle fa-3x mb-3 d-block"></i>
+            <h5>Aucun sujet en attente de validation</h5>
+            <p class="mb-0">Tous les sujets ont été traités.</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modale pour sélectionner le directeur (alternative si besoin) -->
+<div class="modal fade" id="directeurModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-chalkboard-user me-2"></i> Choisir un directeur</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="list-group" id="directeursList">
+                    {% for directeur in directeurs %}
+                        <a href="#" class="list-group-item list-group-item-action director-option" data-id="{{ directeur.id }}" data-nom="{{ directeur.nom_complet }}" data-email="{{ directeur.email }}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ directeur.nom_complet }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ directeur.email }}</small>
+                                </div>
+                                <span class="badge bg-secondary">{{ directeur.charge_actuelle|default(0) }} encours</span>
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentSujetId = null;
+    
+    // Afficher/masquer les détails
+    function toggleDetails(sujetId) {
+        const detailsDiv = document.getElementById(`details_${sujetId}`);
+        const icon = document.getElementById(`expandIcon${sujetId}`);
+        if (detailsDiv.style.display === 'none') {
+            detailsDiv.style.display = 'block';
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        } else {
+            detailsDiv.style.display = 'none';
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+        }
+    }
+    
+    // Afficher les informations du directeur sélectionné
+    $(document).ready(function() {
+        $('.director-select').on('change', function() {
+            const sujetId = $(this).attr('id').split('_')[1];
+            const selectedOption = $(this).find('option:selected');
+            const directeurEmail = selectedOption.data('email');
+            const directeurCharge = selectedOption.data('charge');
+            
+            if (selectedOption.val()) {
+                $(`#directeurInfo_${sujetId}`).show();
+                $(`#directeurEmail_${sujetId}`).html(`Email: ${directeurEmail} | ${directeurCharge} étudiant(s) encours`);
+            } else {
+                $(`#directeurInfo_${sujetId}`).hide();
+            }
+        });
+    });
+    
+    // Fonction d'approbation avec sélection du directeur
+    function approuverSujet(sujetId) {
+        const directeurId = $(`#directeur_${sujetId}`).val();
+        const directeurNom = $(`#directeur_${sujetId}`).find('option:selected').text();
+        
+        if (!directeurId) {
+            alert('Veuillez sélectionner un directeur pour ce sujet');
+            return;
+        }
+        
+        if (confirm(`Confirmez-vous l'approbation de ce sujet avec le directeur: ${directeurNom} ?`)) {
+            $.ajax({
+                url: "{{ url_for('approuver_sujet', sujet_id=0) }}".replace('/0', '/' + sujetId),
+                method: 'POST',
+                data: { directeur_id: directeurId },
+                success: function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert(response.error || "Erreur lors de l'approbation");
+                    }
+                },
+                error: function() {
+                    alert('Erreur lors de l\'approbation');
+                }
+            });
+        }
+    }
+    
+    // Rejet avec motif
+    function rejeterSujet(sujetId) {
+        showMotifDiv(sujetId);
+    }
+    
+    function showMotifDiv(sujetId) {
+        document.querySelectorAll('.motif-input').forEach(el => el.style.display = 'none');
+        const motifDiv = document.getElementById(`motifDiv_${sujetId}`);
+        if (motifDiv) {
+            motifDiv.style.display = 'block';
+            currentSujetId = sujetId;
+        }
+    }
+    
+    function annulerRejet(sujetId) {
+        const motifDiv = document.getElementById(`motifDiv_${sujetId}`);
+        if (motifDiv) {
+            motifDiv.style.display = 'none';
+            document.getElementById(`motif_${sujetId}`).value = '';
+        }
+        currentSujetId = null;
+    }
+    
+    function confirmerRejet(sujetId) {
+        const motif = document.getElementById(`motif_${sujetId}`).value.trim();
+        if (!motif) {
+            alert('Veuillez saisir un motif de rejet');
+            return;
+        }
+        
+        if (confirm(`Confirmez-vous le rejet de ce sujet ? Motif: ${motif.substring(0, 50)}...`)) {
+            $.ajax({
+                url: "{{ url_for('rejeter_sujet', sujet_id=0) }}".replace('/0', '/' + sujetId),
+                method: 'POST',
+                data: { motif: motif },
+                success: function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert(response.error || "Erreur lors du rejet");
+                    }
+                },
+                error: function() {
+                    alert('Erreur lors du rejet');
+                }
+            });
+        }
+    }
+    
+    // Filtres de recherche
+    $(document).ready(function() {
+        $('#searchSujet, #filterDomaine').on('keyup change', function() {
+            const searchTerm = $('#searchSujet').val().toLowerCase();
+            const domaineFilter = $('#filterDomaine').val().toLowerCase();
+            
+            $('.sujet-card').each(function() {
+                const cardDomaine = $(this).data('domaine').toLowerCase();
+                const cardTitre = $(this).data('titre');
+                const cardEtudiant = $(this).data('etudiant');
+                
+                const matchDomaine = !domaineFilter || cardDomaine.includes(domaineFilter);
+                const matchSearch = !searchTerm || cardTitre.includes(searchTerm) || cardEtudiant.includes(searchTerm);
+                
+                $(this).toggle(matchDomaine && matchSearch);
+            });
+        });
+    });
+</script>
+{% endblock %}

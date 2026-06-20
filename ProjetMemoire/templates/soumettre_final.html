@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Soumettre la version finale - UAC{% endblock %}
+
+{% block extra_css %}
+<style>
+    .info-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        padding: 20px;
+        color: white;
+        margin-bottom: 20px;
+    }
+    .warning-box {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .upload-area {
+        border: 2px dashed #ccc;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+        transition: all 0.3s;
+        cursor: pointer;
+        background: #fafafa;
+    }
+    .upload-area:hover {
+        border-color: #0d6efd;
+        background: #f0f7ff;
+    }
+    .file-selected {
+        border-color: #198754;
+        background: #e8f5e9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- En-tête -->
+            <div class="mb-4">
+                <h1 class="display-6 fw-bold">
+                    <i class="fas fa-flag-checkered text-success me-2"></i>
+                    Soumission de la version finale
+                </h1>
+                <p class="text-muted">Soumettez votre mémoire complet pour validation finale par votre directeur</p>
+            </div>
+
+            <!-- Informations du sujet -->
+            <div class="info-box">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-file-alt fa-3x me-3"></i>
+                    <div>
+                        <h5 class="mb-1">{{ sujet.titre }}</h5>
+                        <p class="mb-0 opacity-75">
+                            <i class="fas fa-chalkboard-user me-1"></i> Directeur: {{ sujet.directeur_nom or 'Non attribué' }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Avertissement anti-plagiat -->
+            <div class="warning-box">
+                <div class="d-flex">
+                    <i class="fas fa-shield-alt fa-2x me-3 text-warning"></i>
+                    <div>
+                        <strong class="d-block mb-1">⚠️ Vérification anti-plagiat obligatoire</strong>
+                        <p class="mb-0 small">Votre manuscrit sera automatiquement vérifié par notre système anti-plagiat. 
+                        Le taux de similarité ne doit pas dépasser <strong>{{ config.SEUIL_SIMILARITE }}%</strong>.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulaire -->
+            <form method="POST" enctype="multipart/form-data" id="finalForm">
+                <div class="card shadow-sm">
+                    <div class="card-body p-4">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-file-pdf me-2 text-danger"></i>
+                                Manuscrit final <span class="text-danger">*</span>
+                            </label>
+                            <div class="upload-area" id="uploadArea">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                <p class="mb-1"><strong>Déposez votre manuscrit ici</strong></p>
+                                <p class="text-muted small">ou cliquez pour parcourir</p>
+                                <input type="file" name="manuscrit_final" id="manuscritFile" class="d-none" accept=".pdf,.doc,.docx">
+                                <div id="fileInfo" class="mt-2 small text-muted"></div>
+                            </div>
+                            <div class="form-text mt-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Formats acceptés: PDF, DOC, DOCX (max 20MB)
+                            </div>
+                        </div>
+
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="confirmCheck" required>
+                            <label class="form-check-label" for="confirmCheck">
+                                Je certifie que ce mémoire est mon travail personnel et original.
+                                Je comprends que tout plagiat sera sanctionné conformément au règlement académique.
+                            </label>
+                        </div>
+
+                        <div class="alert alert-info small">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Après soumission:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Une vérification anti-plagiat sera effectuée automatiquement</li>
+                                <li>Votre directeur sera notifié pour validation finale</li>
+                                <li>Vous recevrez une notification une fois le mémoire validé</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white d-flex justify-content-between p-3">
+                        <a href="{{ url_for('voir_sujet', sujet_id=sujet.id) }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Retour
+                        </a>
+                        <button type="submit" class="btn btn-success" id="submitBtn">
+                            <i class="fas fa-paper-plane me-1"></i> Soumettre la version finale
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Gestion de l'upload
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('manuscritFile');
+    const fileInfo = document.getElementById('fileInfo');
+    const submitBtn = document.getElementById('submitBtn');
+    const confirmCheck = document.getElementById('confirmCheck');
+    
+    uploadArea.addEventListener('click', () => fileInput.click());
+    
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('border-primary', 'bg-light');
+    });
+    
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('border-primary', 'bg-light');
+    });
+    
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('border-primary', 'bg-light');
+        const files = e.dataTransfer.files;
+        if (files.length) {
+            fileInput.files = files;
+            updateFileInfo(files[0]);
+        }
+    });
+    
+    fileInput.addEventListener('change', function() {
+        if (this.files.length) {
+            updateFileInfo(this.files[0]);
+        } else {
+            resetFileInfo();
+        }
+    });
+    
+    function updateFileInfo(file) {
+        const fileSize = (file.size / 1024 / 1024).toFixed(2);
+        const fileType = file.name.split('.').pop().toUpperCase();
+        uploadArea.classList.add('file-selected');
+        fileInfo.innerHTML = `
+            <i class="fas fa-check-circle text-success me-1"></i>
+            Fichier sélectionné: ${file.name} (${fileSize} MB) - ${fileType}
+        `;
+    }
+    
+    function resetFileInfo() {
+        uploadArea.classList.remove('file-selected');
+        fileInfo.innerHTML = '';
+    }
+    
+    // Validation du formulaire
+    document.getElementById('finalForm').addEventListener('submit', function(e) {
+        const file = fileInput.files[0];
+        const confirm = confirmCheck.checked;
+        
+        if (!file) {
+            alert('Veuillez sélectionner votre manuscrit final');
+            e.preventDefault();
+            return false;
+        }
+        
+        if (!confirm) {
+            alert('Veuillez confirmer que ce travail est original');
+            e.preventDefault();
+            return false;
+        }
+        
+        if (file.size > 20 * 1024 * 1024) {
+            alert('Le fichier ne doit pas dépasser 20MB');
+            e.preventDefault();
+            return false;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Vérification en cours...';
+        return true;
+    });
+</script>
+{% endblock %}

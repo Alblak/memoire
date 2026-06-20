@@ -1,0 +1,626 @@
+{% extends "base.html" %}
+
+{% block title %}Tableau de bord - Directeur uac{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card-hover {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card-hover:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    .status-attente { background: #fff3cd; color: #856404; }
+    .status-urgent { background: #f8d7da; color: #721c24; }
+    .progress-thin { height: 6px; border-radius: 3px; }
+    .student-avatar {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    .list-group-item-glow {
+        transition: all 0.2s;
+    }
+    .list-group-item-glow:hover {
+        background-color: #f8f9fa;
+        border-left: 3px solid #0d6efd;
+    }
+    /* Style pour les chapitres */
+    .chapitre-progress {
+        font-size: 0.8rem;
+    }
+    .chapitre-badge {
+        display: inline-block;
+        width: 28px;
+        height: 28px;
+        line-height: 28px;
+        text-align: center;
+        border-radius: 50%;
+        font-size: 0.75rem;
+        font-weight: bold;
+        margin-right: 5px;
+    }
+    .chapitre-valide {
+        background: #198754;
+        color: white;
+    }
+    .chapitre-en-cours {
+        background: #ffc107;
+        color: #000;
+    }
+    .chapitre-encours {
+        background: #0d6efd;
+        color: white;
+    }
+    .chapitre-en-attente {
+        background: #6c757d;
+        color: white;
+    }
+    /* Filtre actif */
+    .filter-active {
+        background-color: #0d6efd !important;
+        color: white !important;
+    }
+    .filter-active .text-muted {
+        color: rgba(255,255,255,0.8) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h1 class="display-6 fw-bold">
+                <i class="fas fa-chalkboard-user text-primary me-2"></i>
+                Tableau de bord Directeur
+            </h1>
+            <p class="text-muted">Gérez vos étudiants et suivez les travaux en cours</p>
+        </div>
+        <div class="d-flex gap-2">
+            <!-- FILTRE PAR ANNÉE ACADÉMIQUE -->
+            <div class="card bg-light border-0 {% if annee_selected %}filter-active{% endif %}">
+                <div class="card-body py-2 px-3">
+                    <form method="GET" class="d-flex gap-2 align-items-center">
+                        <label class="small {% if annee_selected %}text-white{% else %}text-muted{% endif %}">
+                            <i class="fas fa-calendar-alt me-1"></i> Année:
+                        </label>
+                        <select name="annee" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                            <option value="">Toutes les années</option>
+                            {% for annee in annees_disponibles %}
+                                <option value="{{ annee.annee_academique }}" 
+                                        {% if annee_selected == annee.annee_academique %}selected{% endif %}>
+                                    {{ annee.annee_academique }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        {% if annee_selected %}
+                            <a href="{{ url_for('dashboard_directeur') }}" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+            <!-- FIN FILTRE -->
+            
+            <div class="card bg-light border-0">
+                <div class="card-body py-2 px-3">
+                    <small class="text-muted"><i class="fas fa-calendar-alt me-1"></i> Année en cours</small>
+                    <strong class="ms-2">{{ annee_en_cours }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cartes statistiques -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 bg-primary text-white shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1 opacity-75">Étudiants encadrés</h6>
+                            <h2 class="mb-0 fw-bold">{{ etudiants_encours|length }}</h2>
+                        </div>
+                        <i class="fas fa-users fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 bg-warning text-dark shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">À corriger</h6>
+                            <h2 class="mb-0 fw-bold">{{ travaux_attente|length }}</h2>
+                        </div>
+                        <i class="fas fa-clock fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 bg-success text-white shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1 opacity-75">Finalisés</h6>
+                            <h2 class="mb-0 fw-bold">
+                                {% if stats_annuelles and stats_annuelles|length > 0 %}
+                                    {{ stats_annuelles[0].finalises if stats_annuelles[0].finalises is defined else 0 }}
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </h2>
+                        </div>
+                        <i class="fas fa-flag-checkered fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 bg-info text-white shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1 opacity-75">Temps moyen correction</h6>
+                            <h2 class="mb-0 fw-bold">
+                                {{ performance.avg_heures_correction if performance and performance.avg_heures_correction else 'N/A' }}h
+                            </h2>
+                        </div>
+                        <i class="fas fa-stopwatch fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Statistiques par année -->
+    {% if stats_annuelles and stats_annuelles|length > 0 %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0 fw-bold">
+                <i class="fas fa-chart-bar me-2 text-primary"></i>
+                Récapitulatif par année académique
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Année académique</th>
+                            <th>Étudiants encadrés</th>
+                            <th>Finalisés</th>
+                            <th>En cours</th>
+                            <th>Taux réussite</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in stats_annuelles %}
+                        <tr>
+                            <td><strong>{{ stat.annee_academique }}</strong></td>
+                            <td>{{ stat.total_etudiants }}</td>
+                            <td class="text-success">{{ stat.finalises }}</td>
+                            <td class="text-primary">{{ stat.en_cours }}</td>
+                            <td>
+                                {% set taux = (stat.finalises / stat.total_etudiants * 100) if stat.total_etudiants > 0 else 0 %}
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="progress flex-grow-1" style="height: 5px;">
+                                        <div class="progress-bar bg-success" style="width: {{ taux }}%"></div>
+                                    </div>
+                                    <small>{{ "%.0f"|format(taux) }}%</small>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Colonne gauche: Travaux à corriger (priorité) -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-edit text-warning me-2"></i>
+                        Travaux en attente de correction
+                        {% if travaux_attente %}
+                            <span class="badge bg-warning ms-2">{{ travaux_attente|length }}</span>
+                        {% endif %}
+                    </h5>
+                    <small class="text-muted">À traiter en priorité</small>
+                </div>
+                <div class="card-body p-0">
+                    {% if travaux_attente %}
+                        <div class="list-group list-group-flush">
+                            {% for travail in travaux_attente %}
+                                {% set jours_attente = travail.jours_attente if travail.jours_attente is defined else 0 %}
+                                {% set urgent = jours_attente > 7 %}
+                                <div class="list-group-item list-group-item-glow p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <span class="badge bg-secondary me-2">
+                                                <i class="fas fa-book me-1"></i>
+                                                Chapitre {{ travail.chapitre_numero if travail.chapitre_numero else (travail.chapitre if travail.chapitre else '?') }}
+                                            </span>
+                                            <span class="badge bg-info">
+                                                {{ travail.titre_chapitre if travail.titre_chapitre else 'Sans titre' }}
+                                            </span>
+                                            {% if urgent %}
+                                                <span class="badge bg-danger">URGENT</span>
+                                            {% endif %}
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="far fa-clock me-1"></i>
+                                            {{ travail.date_soumission.strftime('%d/%m/%Y') if travail.date_soumission else 'Date inconnue' }}
+                                            ({{ jours_attente }} jours)
+                                        </small>
+                                    </div>
+                                    <h6 class="mb-1">{{ travail.sujet_titre if travail.sujet_titre else 'Sujet' }}</h6>
+                                    <p class="small text-muted mb-2">
+                                        <i class="fas fa-user-graduate me-1"></i> {{ travail.etudiant_nom if travail.etudiant_nom else 'Étudiant' }}
+                                    </p>
+                                    <div class="progress progress-thin mb-3">
+                                        {% set progress_width = (jours_attente / 14 * 100) if jours_attente <= 14 else 100 %}
+                                        <div class="progress-bar {% if urgent %}bg-danger{% else %}bg-warning{% endif %}" style="width: {{ progress_width }}%"></div>
+                                    </div>
+                                    <a href="{{ url_for('corriger_version', version_id=travail.id) }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-pen-fancy me-1"></i> Corriger le chapitre
+                                    </a>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                            <p class="text-muted">Aucun travail en attente. Vous êtes à jour !</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Colonne droite: Versions finales à valider -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-flag-checkered text-success me-2"></i>
+                        Versions finales à valider
+                        {% if finals_attente %}
+                            <span class="badge bg-success ms-2">{{ finals_attente|length }}</span>
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if finals_attente %}
+                        <div class="list-group list-group-flush">
+                            {% for final in finals_attente %}
+                                <div class="list-group-item list-group-item-glow p-3">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <h6 class="fw-bold mb-0">{{ final.sujet_titre if final.sujet_titre else 'Sujet' }}</h6>
+                                        <span class="badge bg-success">Mémoire complet</span>
+                                    </div>
+                                    <p class="small mb-2">
+                                        <i class="fas fa-user-graduate me-1"></i> {{ final.etudiant_nom if final.etudiant_nom else 'Étudiant' }}
+                                    </p>
+                                    <div class="row small mb-3">
+                                        <div class="col-6">
+                                            <span class="text-muted">Similarité:</span>
+                                            <strong class="{% if final.taux_similarite and final.taux_similarite > 20 %}text-danger{% else %}text-success{% endif %}">
+                                                {{ "%.1f"|format(final.taux_similarite) if final.taux_similarite else '0.0' }}%
+                                            </strong>
+                                        </div>
+                                        <div class="col-6">
+                                            <span class="text-muted">Détection IA:</span>
+                                            <strong class="{% if final.score_genai and final.score_genai > 0.6 %}text-danger{% else %}text-success{% endif %}">
+                                                {{ "%.0f"|format(final.score_genai * 100) if final.score_genai else '0' }}%
+                                            </strong>
+                                        </div>
+                                    </div>
+                                    <a href="{{ url_for('valider_final_directeur', version_id=final.id) }}" class="btn btn-sm btn-outline-success">
+                                        <i class="fas fa-check-double me-1"></i> Examiner & valider
+                                    </a>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-hourglass-half fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">Aucune version finale en attente de validation</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des étudiants encadrés -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="mb-0 fw-bold">
+                <i class="fas fa-users me-2 text-primary"></i>
+                Mes étudiants encadrés
+            </h5>
+            <div class="input-group w-auto">
+                <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+                <input type="text" id="searchStudent" class="form-control" placeholder="Rechercher étudiant..." style="max-width: 250px;">
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if etudiants_encours %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="studentsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Étudiant</th>
+                                <th>Sujet</th>
+                                <th>Progression chapitres</th>
+                                <th>Domaine</th>
+                                <th>Dernière activité</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for etudiant in etudiants_encours %}
+                                <tr class="student-row">
+                                    <td style="vertical-align: middle">
+                                        <div class="d-flex align-items-center">
+                                            <div class="student-avatar me-2">
+                                                {{ etudiant.etudiant_prenom[0] if etudiant.etudiant_prenom else 'E' }}{{ etudiant.etudiant_nom[0] if etudiant.etudiant_nom else 'T' }}
+                                            </div>
+                                            <div>
+                                                <strong>{{ etudiant.etudiant_prenom if etudiant.etudiant_prenom else '' }} {{ etudiant.etudiant_nom if etudiant.etudiant_nom else '' }}</strong><br>
+                                                <small class="text-muted">{{ etudiant.matricule if etudiant.matricule else 'Matricule' }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td style="vertical-align: middle">
+                                        <div class="fw-semibold">{{ etudiant.titre if etudiant.titre else 'Sujet' }}</div>
+                                        <small class="text-muted">
+                                            <i class="fas fa-calendar me-1"></i>
+                                            Attribué le {{ etudiant.date_attribution.strftime('%d/%m/%Y') if etudiant.date_attribution else 'Date inconnue' }}
+                                        </small>
+                                    </td>
+                                    <td style="vertical-align: middle">
+                                        <div class="chapitre-progress">
+                                            <div class="d-flex align-items-center mb-1 flex-wrap">
+                                                <span class="chapitre-badge {% if etudiant.chapitre_1_valide %}chapitre-valide{% elif etudiant.chapitre_courant == 1 %}chapitre-en-cours{% else %}chapitre-en-attente{% endif %}"
+                                                      title="Chapitre 1: {{ etudiant.chapitre_1_titre|default('Introduction') }}">
+                                                    1
+                                                </span>
+                                                <i class="fas fa-arrow-right mx-1 text-muted small"></i>
+                                                <span class="chapitre-badge {% if etudiant.chapitre_2_valide %}chapitre-valide{% elif etudiant.chapitre_courant == 2 %}chapitre-en-cours{% else %}chapitre-en-attente{% endif %}"
+                                                      title="Chapitre 2: {{ etudiant.chapitre_2_titre|default('Revue de littérature') }}">
+                                                    2
+                                                </span>
+                                                <i class="fas fa-arrow-right mx-1 text-muted small"></i>
+                                                <span class="chapitre-badge {% if etudiant.chapitre_3_valide %}chapitre-valide{% elif etudiant.chapitre_courant == 3 %}chapitre-en-cours{% else %}chapitre-en-attente{% endif %}"
+                                                      title="Chapitre 3: {{ etudiant.chapitre_3_titre|default('Méthodologie') }}">
+                                                    3
+                                                </span>
+                                                <i class="fas fa-arrow-right mx-1 text-muted small"></i>
+                                                <span class="chapitre-badge {% if etudiant.chapitre_4_valide %}chapitre-valide{% elif etudiant.chapitre_courant == 4 %}chapitre-en-cours{% else %}chapitre-en-attente{% endif %}"
+                                                      title="Chapitre 4: {{ etudiant.chapitre_4_titre|default('Résultats') }}">
+                                                    4
+                                                </span>
+                                                <i class="fas fa-arrow-right mx-1 text-muted small"></i>
+                                                <span class="chapitre-badge {% if etudiant.chapitre_5_valide %}chapitre-valide{% elif etudiant.chapitre_courant == 5 %}chapitre-en-cours{% else %}chapitre-en-attente{% endif %}"
+                                                      title="Chapitre 5: {{ etudiant.chapitre_5_titre|default('Discussion') }}">
+                                                    5
+                                                </span>
+                                            </div>
+                                            <div class="small text-muted mt-1">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                {% set chapitre_courant = etudiant.chapitre_courant|default(1) %}
+                                                {% if chapitre_courant <= 5 %}
+                                                    En cours: Chapitre {{ chapitre_courant }}
+                                                    ({% if etudiant.version_attente %}en attente de correction{% else %}à soumettre{% endif %})
+                                                {% else %}
+                                                    Tous les chapitres validés !
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td style="vertical-align: middle">
+                                        {{ etudiant.domaine_nom if etudiant.domaine_nom else 'Domaine' }}
+                                    </td>
+                                    <td style="vertical-align: middle">
+                                        {% if etudiant.date_derniere_soumission %}
+                                            <small>{{ etudiant.date_derniere_soumission.strftime('%d/%m/%Y') }}</small>
+                                        {% else %}
+                                            <small class="text-muted">Aucune activité</small>
+                                        {% endif %}
+                                    </td>
+                                    <td style="vertical-align: middle">
+                                        <div class="btn-group btn-group-sm">
+                                            {% if etudiant.sujet_id is defined and etudiant.sujet_id %}
+                                                <a href="{{ url_for('directeur_voir_sujet', sujet_id=etudiant.sujet_id) }}" class="btn btn-outline-primary" title="Voir détails">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            {% else %}
+                                                <button class="btn btn-outline-secondary" disabled title="Sujet introuvable">
+                                                    <i class="fas fa-eye-slash"></i>
+                                                </button>
+                                            {% endif %}
+                                            {% set premiere_version = etudiant.premiere_version_attente_id if etudiant.premiere_version_attente_id is defined else None %}
+                                            {% if premiere_version %}
+                                                <a href="{{ url_for('corriger_version', version_id=premiere_version) }}" class="btn btn-outline-warning" title="Corriger">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-user-friends fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Vous n'avez pas encore d'étudiants encadrés.</p>
+                    <p class="small text-muted">Le doyen vous attribuera des étudiants une fois les sujets validés.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Historique et statistiques -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-chart-simple me-2 text-primary"></i>
+                        Évolution des travaux par année
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if stats_annuelles and stats_annuelles|length > 1 %}
+                        <canvas id="evolutionChart" height="250"></canvas>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-chart-line fa-3x text-muted mb-2"></i>
+                            <p class="text-muted">Données insuffisantes pour afficher le graphique</p>
+                            <small class="text-muted">Ajoutez des étudiants sur plusieurs années</small>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-gauge-high me-2 text-primary"></i>
+                        Performance du directeur
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if performance %}
+                        <div class="row text-center mb-4">
+                            <div class="col-4">
+                                <div class="border rounded p-2">
+                                    <h4 class="text-primary mb-0">{{ performance.total_corrections if performance.total_corrections else 0 }}</h4>
+                                    <small class="text-muted">Corrections effectuées</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="border rounded p-2">
+                                    <h4 class="text-success mb-0">{{ performance.avg_heures_correction if performance.avg_heures_correction else 'N/A' }}h</h4>
+                                    <small class="text-muted">Temps moyen</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="border rounded p-2">
+                                    <h4 class="text-info mb-0">
+                                        {% set total_corr = performance.total_corrections if performance.total_corrections else 0 %}
+                                        {% set nb_etudiants = etudiants_encours|length %}
+                                        {% if nb_etudiants > 0 %}
+                                            {{ ((total_corr / (nb_etudiants * 10)) * 100)|round if total_corr > 0 else 0 }}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </h4>
+                                    <small class="text-muted">Taux d'engagement</small>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-3">
+                            <p class="text-muted">Aucune donnée de performance disponible</p>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="alert alert-info small">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>Astuce:</strong> Plus vous corrigez rapidement, plus vos étudiants peuvent progresser. 
+                        Essayez de répondre dans les {{ config.DELAI_CORRECTION_DIRECTEUR if config.DELAI_CORRECTION_DIRECTEUR is defined else 7 }} jours recommandés.
+                    </div>
+                    
+                    <div class="alert alert-secondary small mt-2">
+                        <i class="fas fa-book me-2"></i>
+                        <strong>Workflow des chapitres:</strong><br>
+                        Quand vous validez un chapitre (statut = "valide"), le système déverrouille automatiquement le chapitre suivant pour l'étudiant.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Graphique d'évolution par année
+    {% if stats_annuelles and stats_annuelles|length > 1 %}
+    const ctx = document.getElementById('evolutionChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [{% for stat in stats_annuelles %}'{{ stat.annee_academique }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Étudiants encadrés',
+                data: [{% for stat in stats_annuelles %}{{ stat.total_etudiants }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                tension: 0.3,
+                fill: true
+            }, {
+                label: 'Finalisés',
+                data: [{% for stat in stats_annuelles %}{{ stat.finalises }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Nombre d\'étudiants' }
+                }
+            },
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+    {% endif %}
+    
+    // Recherche en temps réel
+    $('#searchStudent').on('keyup', function() {
+        const searchTerm = $(this).val().toLowerCase();
+        $('.student-row').each(function() {
+            const text = $(this).text().toLowerCase();
+            $(this).toggle(text.indexOf(searchTerm) > -1);
+        });
+    });
+</script>
+{% endblock %}

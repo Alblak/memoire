@@ -1,0 +1,704 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord - Doyen UAC{% endblock %}
+{% block extra_css %}
+<style>
+    .stat-big-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .domain-card {
+        border-left: 4px solid;
+        transition: transform 0.2s;
+    }
+    .domain-card:hover {
+        transform: translateX(5px);
+    }
+    .alert-critical {
+        background: #dc3545;
+        color: white;
+        border: none;
+    }
+    .status-circle {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 6px;
+    }
+    .list-group-item-warning {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+    }
+    .card-hover {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card-hover:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    /* Style pour la progression chapitres */
+    .chapitre-progress-mini {
+        display: flex;
+        gap: 4px;
+        margin-top: 5px;
+    }
+    .chapitre-dot {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: inline-block;
+        font-size: 0.6rem;
+        text-align: center;
+        line-height: 20px;
+        color: white;
+        font-weight: bold;
+    }
+    .chapitre-dot.valide { background: #198754; }
+    .chapitre-dot.en-cours { background: #0d6efd; }
+    .chapitre-dot.encours { background: #0d6efd; }
+    .chapitre-dot.en-attente { background: #6c757d; }
+    /* Filtre actif */
+    .filter-active {
+        background-color: #0d6efd !important;
+        color: white !important;
+    }
+    .filter-active .text-muted, .filter-active small {
+        color: rgba(255,255,255,0.8) !important;
+    }
+    .filter-active a {
+        color: white !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête avec bienvenue -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h1 class="display-6 fw-bold">
+                <i class="fas fa-gavel text-primary me-2"></i>
+                Tableau de bord Doyen
+            </h1>
+            <p class="text-muted">
+                Vue d'ensemble et supervision de la faculté de <strong>{{ domaine_nom }} ({{ domaine_code }})</strong>
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <!-- FILTRE PAR ANNÉE ACADÉMIQUE -->
+            <div class="card bg-light border-0 {% if annee_selected %}filter-active{% endif %}">
+                <div class="card-body py-2 px-3">
+                    <form method="GET" class="d-flex gap-2 align-items-center">
+                        <label class="small {% if annee_selected %}text-white{% else %}text-muted{% endif %}">
+                            <i class="fas fa-calendar-alt me-1"></i> Année académique:
+                        </label>
+                        <select name="annee" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                            <option value="">Toutes les années</option>
+                            {% for annee in annees_disponibles %}
+                                <option value="{{ annee.annee_academique }}" 
+                                        {% if annee_selected == annee.annee_academique %}selected{% endif %}>
+                                    {{ annee.annee_academique }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        {% if annee_selected %}
+                            <a href="{{ url_for('dashboard_doyen') }}" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+            <!-- FIN FILTRE -->
+            
+            <div class="btn-group">
+                <a href="{{ url_for('historique_complet') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-chart-line me-1"></i> Rapport détaillé
+                </a>
+                <button class="btn btn-outline-secondary" onclick="window.print()">
+                    <i class="fas fa-print me-1"></i> Exporter
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cartes statistiques principales -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white card-hover">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small class="opacity-75">Total des sujets</small>
+                            <div class="stat-big-number">{{ stats_generales.total_sujets|default(0) }}</div>
+                        </div>
+                        <i class="fas fa-file-alt fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark card-hover">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small>En attente de validation</small>
+                            <div class="stat-big-number">{{ stats_generales.en_attente|default(0) }}</div>
+                        </div>
+                        <i class="fas fa-hourglass-half fa-3x opacity-50"></i>
+                    </div>
+                    {% if stats_generales.en_attente|default(0) > 0 %}
+                        <a href="#sujetsAttente" class="text-dark small mt-2 d-inline-block">Voir les sujets <i class="fas fa-arrow-right"></i></a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white card-hover">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small>Mémoires finalisés</small>
+                            <div class="stat-big-number">{{ stats_generales.finalises|default(0) }}</div>
+                        </div>
+                        <i class="fas fa-graduation-cap fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white card-hover">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small>Taux similarité moyen</small>
+                            <div class="stat-big-number">{{ stats_generales.taux_similarite_moyen|default(0) }}%</div>
+                        </div>
+                        <i class="fas fa-chart-line fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques supplémentaires (carte) -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white card-hover">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small>Approuvés</small>
+                            <div class="stat-big-number">{{ stats_generales.approuves|default(0) }}</div>
+                        </div>
+                        <i class="fas fa-check-circle fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white card-hover">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small>Rejetés</small>
+                            <div class="stat-big-number">{{ stats_generales.rejetes|default(0) }}</div>
+                        </div>
+                        <i class="fas fa-times-circle fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark text-white card-hover">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small>Directeurs actifs</small>
+                            <div class="stat-big-number">{{ stats_generales.directeurs_actifs|default(0) }}</div>
+                        </div>
+                        <i class="fas fa-chalkboard-user fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark text-white card-hover">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small>Étudiants actifs</small>
+                            <div class="stat-big-number">{{ stats_generales.etudiants_actifs|default(0) }}</div>
+                        </div>
+                        <i class="fas fa-users fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Graphique d'évolution par année -->
+    {% if stats_par_annee and stats_par_annee|length > 0 %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0 fw-bold">
+                <i class="fas fa-chart-line me-2 text-primary"></i>
+                Évolution par année académique
+            </h5>
+        </div>
+        <div class="card-body">
+            <canvas id="evolutionParAnneeChart" height="200"></canvas>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Colonne gauche: Sujets à valider en priorité -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm mb-4" id="sujetsAttente">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-clipboard-list text-warning me-2"></i>
+                        Sujets en attente de validation
+                        <span class="badge bg-warning ms-2">{{ sujets_attente|length }}</span>
+                    </h5>
+                    <a href="{{ url_for('valider_sujets') }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-arrow-right me-1"></i> Gérer tous
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if sujets_attente %}
+                        <div class="list-group list-group-flush">
+                            {% for sujet in sujets_attente %}
+                                <div class="list-group-item list-group-item-action">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <span class="badge bg-secondary me-2">{{ sujet.domaine_code }}</span>
+                                            {% if sujet.jours_attente is defined and sujet.jours_attente > 14 %}
+                                                <span class="badge bg-danger">Retard validation</span>
+                                            {% elif sujet.jours_attente is defined and sujet.jours_attente > 7 %}
+                                                <span class="badge bg-warning">En attente > 7j</span>
+                                            {% endif %}
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="far fa-calendar-alt me-1"></i>
+                                            {{ sujet.date_soumission.strftime('%d/%m/%Y') if sujet.date_soumission else 'Date inconnue' }}
+                                            {% if sujet.jours_attente is defined %}
+                                                ({{ sujet.jours_attente }} jours)
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                    <h6 class="mb-1">{{ sujet.titre }}</h6>
+                                    <p class="small text-muted mb-2">
+                                        <i class="fas fa-user-graduate me-1"></i> {{ sujet.etudiant_nom }} ({{ sujet.matricule }})
+                                    </p>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-sm btn-outline-success" onclick="quickApprove({{ sujet.id }})">
+                                            <i class="fas fa-check me-1"></i> Approuver
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="quickReject({{ sujet.id }})">
+                                            <i class="fas fa-times me-1"></i> Rejeter
+                                        </button>
+                                        <a href="#" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#sujetModal{{ sujet.id }}">
+                                            <i class="fas fa-eye me-1"></i> Détails
+                                        </a>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                            <p class="text-muted">Aucun sujet en attente de validation.</p>
+                            <p class="small text-muted">Tous les sujets ont été traités.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Statistiques par domaine -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-chart-pie me-2 text-primary"></i>
+                        Répartition par domaine (année en cours)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <canvas id="domainesChart" height="200"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="list-group">
+                                {% for domaine in stats_domaines %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="status-circle" style="background: {{ loop.cycle('#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1') }}"></span>
+                                            <strong>{{ domaine.domaine_nom }}</strong>
+                                        </div>
+                                        <div>
+                                            <span class="badge bg-primary rounded-pill">{{ domaine.total }}</span>
+                                            <small class="text-muted ms-2">{{ domaine.finalises }} finalisés</small>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-3 text-muted">
+                                        <small>Aucune donnée disponible pour votre faculté</small>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Colonne droite: Alertes et performances -->
+        <div class="col-lg-5">
+            <!-- Alertes retards critiques -->
+            {% if alertes_retards %}
+                <div class="card border-danger mb-4">
+                    <div class="card-header bg-danger text-white">
+                        <i class="fas fa-bell me-2"></i> Alertes critiques - Retards
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush">
+                            {% for alerte in alertes_retards[:5] %}
+                                <div class="list-group-item list-group-item-warning">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <strong>{{ alerte.etudiant_nom }}</strong>
+                                        <span class="badge bg-danger">{{ alerte.jours_retard|default(alerte.retard, true) }} jours de retard</span>
+                                    </div>
+                                    <div class="small">
+                                        <i class="fas fa-chalkboard-user me-1"></i> Directeur: {{ alerte.directeur_nom }}<br>
+                                        <i class="fas fa-tasks me-1"></i> Étape: {{ alerte.etape }}
+                                    </div>
+                                    {% if alerte.chapitre_numero %}
+                                        <div class="small mt-1">
+                                            <i class="fas fa-book me-1"></i> Chapitre: {{ alerte.chapitre_numero }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="card border-success mb-4">
+                    <div class="card-header bg-success text-white">
+                        <i class="fas fa-check-circle me-2"></i> Aucun retard
+                    </div>
+                    <div class="card-body text-center py-4">
+                        <i class="fas fa-clock fa-3x text-success mb-2"></i>
+                        <p class="mb-0">Tous les travaux sont dans les délais.</p>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Performance des directeurs -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-trophy me-2 text-warning"></i>
+                        Top directeurs
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for directeur in performance_directeurs[:5] %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas fa-user-circle me-2 text-primary"></i>
+                                        <strong>{{ directeur.directeur_nom }}</strong>
+                                    </div>
+                                    <span class="badge bg-primary rounded-pill">{{ directeur.total_encadres }} encadrés</span>
+                                </div>
+                                <div class="small text-muted mt-2">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <i class="fas fa-flag-checkered me-1"></i> {{ directeur.finalises }} finalisés
+                                        </div>
+                                        <div class="col-6">
+                                            <i class="fas fa-hourglass-half me-1"></i> Délai: {{ directeur.duree_moyenne|round }} j
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="progress mt-2" style="height: 4px;">
+                                    {% set taux = (directeur.finalises / directeur.total_encadres * 100) if directeur.total_encadres and directeur.total_encadres > 0 else 0 %}
+                                    <div class="progress-bar bg-success" style="width: {{ taux }}%"></div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-chart-line fa-3x text-muted mb-2"></i>
+                                <p class="text-muted">Aucune donnée disponible</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- État des chapitres -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-layer-group me-2 text-info"></i>
+                        Vue d'ensemble des chapitres
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if chapitres_stats %}
+                        <div class="row text-center">
+                            <div class="col-2">
+                                <div class="chapitre-dot valide mx-auto mb-1">1</div>
+                                <small class="text-muted">Ch1</small>
+                                <div class="fw-bold">{{ chapitres_stats.ch1_valides|default(0) }}</div>
+                            </div>
+                            <div class="col-2">
+                                <div class="chapitre-dot valide mx-auto mb-1">2</div>
+                                <small class="text-muted">Ch2</small>
+                                <div class="fw-bold">{{ chapitres_stats.ch2_valides|default(0) }}</div>
+                            </div>
+                            <div class="col-2">
+                                <div class="chapitre-dot valide mx-auto mb-1">3</div>
+                                <small class="text-muted">Ch3</small>
+                                <div class="fw-bold">{{ chapitres_stats.ch3_valides|default(0) }}</div>
+                            </div>
+                            <div class="col-2">
+                                <div class="chapitre-dot valide mx-auto mb-1">4</div>
+                                <small class="text-muted">Ch4</small>
+                                <div class="fw-bold">{{ chapitres_stats.ch4_valides|default(0) }}</div>
+                            </div>
+                            <div class="col-2">
+                                <div class="chapitre-dot valide mx-auto mb-1">5</div>
+                                <small class="text-muted">Ch5</small>
+                                <div class="fw-bold">{{ chapitres_stats.ch5_valides|default(0) }}</div>
+                            </div>
+                            <div class="col-2">
+                                <div class="chapitre-dot bg-success mx-auto mb-1">
+                                    <i class="fas fa-check fa-xs"></i>
+                                </div>
+                                <small class="text-muted">Total</small>
+                                <div class="fw-bold">{{ chapitres_stats.total_valides|default(0) }}</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 small text-muted text-center">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Nombre de chapitres validés par les directeurs
+                        </div>
+                    {% else %}
+                        <div class="text-center py-3">
+                            <i class="fas fa-chart-simple fa-2x text-muted mb-2"></i>
+                            <p class="text-muted small">Aucune donnée de chapitre disponible</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Conseils rapides -->
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3"><i class="fas fa-lightbulb text-warning me-2"></i>Actions rapides</h6>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary" onclick="location.href='{{ url_for('valider_sujets') }}'">
+                            <i class="fas fa-check-double me-2"></i> Valider les sujets en attente
+                        </button>
+                        <button class="btn btn-outline-success" onclick="location.href='{{ url_for('historique_complet') }}'">
+                            <i class="fas fa-chart-line me-2"></i> Consulter les rapports détaillés
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="window.location.reload()">
+                            <i class="fas fa-sync-alt me-2"></i> Rafraîchir les données
+                        </button>
+                    </div>
+                    <hr>
+                    <div class="small text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Faculté de {{ domaine_nom }} - Les données sont actualisées en temps réel.
+                    </div>
+                    <div class="small text-muted mt-2">
+                        <i class="fas fa-book me-1"></i>
+                        <strong>Workflow chapitres:</strong> Quand un directeur valide un chapitre, le suivant est automatiquement déverrouillé.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modales pour approuver/rejeter rapide -->
+{% for sujet in sujets_attente %}
+<div class="modal fade" id="sujetModal{{ sujet.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Détails du sujet</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6>{{ sujet.titre }}</h6>
+                <p class="small text-muted">{{ sujet.etudiant_nom }} - {{ sujet.domaine_nom }}</p>
+                <hr>
+                <p><strong>Description:</strong><br>{{ sujet.description or 'Aucune description fournie' }}</p>
+                {% if sujet.mots_cles %}
+                    <p><strong>Mots-clés:</strong> {{ sujet.mots_cles }}</p>
+                {% endif %}
+                {% if sujet.fichier_concept %}
+                    <p><strong>Concept paper:</strong> 
+                        <a href="#" class="btn btn-sm btn-outline-primary mt-2">Télécharger</a>
+                    </p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" onclick="quickReject({{ sujet.id }})">Rejeter</button>
+                <button type="button" class="btn btn-success" onclick="quickApprove({{ sujet.id }})">Approuver</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Graphique des domaines
+    {% if stats_domaines and stats_domaines|length > 0 %}
+    const domainesCtx = document.getElementById('domainesChart').getContext('2d');
+    new Chart(domainesCtx, {
+        type: 'doughnut',
+        data: {
+            labels: [{% for domaine in stats_domaines %}'{{ domaine.domaine_nom }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+            datasets: [{
+                data: [{% for domaine in stats_domaines %}{{ domaine.total }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                backgroundColor: ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#fd7e14', '#20c997'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.label}: ${context.raw} sujet(s)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    {% else %}
+    const domainesCtx = document.getElementById('domainesChart').getContext('2d');
+    new Chart(domainesCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Aucune donnée'],
+            datasets: [{
+                data: [1],
+                backgroundColor: ['#6c757d'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: { callbacks: { label: function() { return 'Aucun sujet cette année'; } } }
+            }
+        }
+    });
+    {% endif %}
+    
+    // Graphique d'évolution par année académique
+    {% if stats_par_annee and stats_par_annee|length > 0 %}
+    const evolutionCtx = document.getElementById('evolutionParAnneeChart').getContext('2d');
+    new Chart(evolutionCtx, {
+        type: 'bar',
+        data: {
+            labels: [{% for stat in stats_par_annee %}'{{ stat.annee_academique }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+            datasets: [
+                {
+                    label: 'Total sujets',
+                    data: [{% for stat in stats_par_annee %}{{ stat.total_sujets }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                    backgroundColor: 'rgba(13, 110, 253, 0.5)',
+                    borderColor: '#0d6efd',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Finalisés',
+                    data: [{% for stat in stats_par_annee %}{{ stat.finalises }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                    backgroundColor: 'rgba(25, 135, 84, 0.5)',
+                    borderColor: '#198754',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: { 
+                    beginAtZero: true, 
+                    title: { display: true, text: 'Nombre de sujets' } 
+                },
+                x: {
+                    title: { display: true, text: 'Année académique' }
+                }
+            },
+            plugins: { 
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.raw}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    {% endif %}
+    
+    // Actions rapides
+    function quickApprove(sujetId) {
+        const directeurId = prompt("ID du directeur à attribuer (ex: 2):\n\nDirecteurs disponibles:\n- SHS: 6\n- SAE: 7\n- SEG: 8\n- ST: 9\n- SPE: 10");
+        if (directeurId && directeurId.trim() !== '') {
+            $.post("{{ url_for('approuver_sujet', sujet_id=0) }}".replace('/0', '/' + sujetId), 
+                   { directeur_id: directeurId })
+                .done(function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert(response.error || "Erreur lors de l'approbation");
+                    }
+                })
+                .fail(function() { alert("Erreur lors de l'approbation"); });
+        } else if (directeurId === '') {
+            alert("Veuillez entrer un ID de directeur");
+        }
+    }
+    
+    function quickReject(sujetId) {
+        const motif = prompt('Motif du rejet :');
+        if (motif && motif.trim() !== '') {
+            $.post("{{ url_for('rejeter_sujet', sujet_id=0) }}".replace('/0', '/' + sujetId), 
+                   { motif: motif })
+                .done(function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert(response.error || "Erreur lors du rejet");
+                    }
+                })
+                .fail(function() { alert("Erreur lors du rejet"); });
+        } else if (motif === '') {
+            alert("Veuillez saisir un motif de rejet");
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<!-- 
+    base.html
+    Template de base pour le système de gestion des mémoires UAC
+    Contient la structure commune à toutes les pages
+    Intègre Bootstrap 5, FontAwesome, et les fonctions JS globales
+-->
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta name="description" content="Système de gestion des mémoires et thèses - Université de l'Assomption au Congo">
+    <meta name="author" content="Direction Informatique UAC">
+    <title>{% block title %}uac - Gestion des Mémoires{% endblock %}</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    
+    <!-- Bootstrap 5 CSS (CDN avec fallback local) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}" media="none" onload="if(media!='all')media='all'">
+    
+    <!-- Font Awesome Icons 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- Google Fonts - Poppins pour une meilleure lisibilité -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js pour graphiques -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- CSRF Token pour les formulaires Ajax -->
+    <meta name="csrf-token" content="{{ csrf_token() if csrf_token else '' }}">
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- ==================== BARRE DE NAVIGATION ==================== -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top shadow-sm">
+        <div class="container-fluid">
+            <!-- Logo et marque -->
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+                <img src="{{ url_for('static', filename='images/uac-logo.png') }}" 
+                     alt="UAC Logo" 
+                     height="45" 
+                     class="d-inline-block align-text-top me-2"
+                     onerror="this.src='https://via.placeholder.com/45x45?text=UAC'">
+                <div>
+                    <strong>uac</strong><br>
+                    <small class="text-white-50">Gestion des Mémoires</small>
+                </div>
+            </a>
+            
+            <!-- Bouton responsive (mobile) -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <!-- Contenu de la navbar -->
+            <div class="collapse navbar-collapse" id="navbarMain">
+                <!-- Menu de gauche (liens principaux) -->
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    {% if session.user_id %}
+                        <!-- Dashboard selon le rôle -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('dashboard') }}">
+                                <i class="fas fa-tachometer-alt"></i> Tableau de bord
+                            </a>
+                        </li>
+                        
+                        {% if session.role == 'etudiant' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('soumettre_sujet') }}">
+                                <i class="fas fa-paper-plane"></i> Nouveau sujet
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('dashboard_etudiant') }}">
+                                <i class="fas fa-list"></i> Mes sujets
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% if session.role == 'directeur' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('dashboard_directeur') }}">
+                                <i class="fas fa-users"></i> Mes étudiants
+                            </a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="correctionsDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-check-double"></i> Corrections
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('dashboard_directeur') }}#a_corriger">À corriger</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('dashboard_directeur') }}#finales">Finales à valider</a></li>
+                            </ul>
+                        </li>
+                        {% endif %}
+                        
+                        {% if session.role == 'doyen' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('valider_sujets') }}">
+                                <i class="fas fa-clipboard-list"></i> Valider sujets
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('historique_complet') }}">
+                                <i class="fas fa-history"></i> Historique
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('dashboard_doyen') }}#statistiques">
+                                <i class="fas fa-chart-line"></i> Statistiques
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        <!-- Lien notifications -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('notifications_centre') }}">
+                                <i class="fas fa-bell"></i> Notifications
+                                <span id="navNotificationsBadge" class="badge bg-danger ms-1 d-none">0</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="#features">Fonctionnalités</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#about">À propos</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#contact">Contact</a>
+                        </li>
+                    {% endif %}
+                </ul>
+                
+                <!-- Menu de droite (utilisateur) -->
+                {% if session.user_id %}
+                <div class="d-flex align-items-center">
+                    <!-- Dropdown notifications rapide -->
+                    <div class="dropdown me-3">
+                        <button class="btn btn-outline-light position-relative" type="button" id="quickNotificationsBtn" data-bs-toggle="dropdown">
+                            <i class="fas fa-bell"></i>
+                            <span id="quickNotificationsCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end p-0" id="quickNotificationsList" style="width: 350px; max-height: 400px; overflow-y: auto;">
+                            <div class="p-2 text-center text-muted">Chargement...</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Dropdown profil -->
+                    <div class="dropdown">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>
+                            <span class="d-none d-md-inline">{{ session.user_prenom }} {{ session.user_nom }}</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header"><i class="fas fa-id-card"></i> {{ session.matricule }}</h6></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-user"></i> Mon profil</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-cog"></i> Paramètres</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-chart-pie"></i> Mes statistiques</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Déconnexion</a></li>
+                        </ul>
+                    </div>
+                </div>
+                {% else %}
+                <div class="d-flex">
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-light">
+                        <i class="fas fa-sign-in-alt"></i> Connexion
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    
+    <!-- ==================== CONTENU PRINCIPAL ==================== -->
+    <main class="container-fluid py-4">
+        <!-- Messages flash (alertes) -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show shadow-sm rounded-3" role="alert">
+                            <div class="d-flex align-items-center">
+                                {% if category == 'success' %}
+                                    <i class="fas fa-check-circle fs-4 me-3 text-success"></i>
+                                {% elif category == 'danger' %}
+                                    <i class="fas fa-exclamation-triangle fs-4 me-3 text-danger"></i>
+                                {% elif category == 'warning' %}
+                                    <i class="fas fa-clock fs-4 me-3 text-warning"></i>
+                                {% else %}
+                                    <i class="fas fa-info-circle fs-4 me-3 text-info"></i>
+                                {% endif %}
+                                <div class="flex-grow-1">{{ message|safe }}</div>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        <!-- Barre de progression pour chargements Asynchrones -->
+        <div id="loadingProgress" class="progress d-none" style="height: 3px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+        </div>
+        
+        <!-- Contenu spécifique de la page -->
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- ==================== FOOTER ==================== -->
+    <footer class="bg-dark text-white-50 py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <h6 class="text-white mb-3">Université de l'Assomption au Congo</h6>
+                    <p class="small">
+                        <i class="fas fa-map-marker-alt me-2"></i> Kinshasa, République Démocratique du Congo<br>
+                        <i class="fas fa-phone me-2"></i> +243 990 456 789<br>
+                        <i class="fas fa-envelope me-2"></i> contact@uaconline.edu.cd
+                    </p>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <h6 class="text-white mb-3">Liens utiles</h6>
+                    <ul class="list-unstyled small">
+                        <li><a href="https://www.uaconline.edu.cd" class="text-white-50 text-decoration-none" target="_blank">Site officiel UAC</a></li>
+                        <li class="mt-2"><a href="#" class="text-white-50 text-decoration-none">Règlement des mémoires</a></li>
+                        <li class="mt-2"><a href="#" class="text-white-50 text-decoration-none">Guide anti-plagiat</a></li>
+                        <li class="mt-2"><a href="#" class="text-white-50 text-decoration-none">Support technique</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <h6 class="text-white mb-3">Informations système</h6>
+                    <p class="small mb-1"><i class="fas fa-code-branch"></i> Version: 2.0.0</p>
+                    <p class="small mb-1"><i class="fas fa-database"></i> MAJ: Janvier 2026</p>
+                    <p class="small">
+                        <i class="fas fa-shield-alt"></i> Protection anti-plagiat<br>
+                        <span class="badge bg-success mt-1">Certifié UAC</span>
+                    </p>
+                </div>
+            </div>
+            <hr class="border-secondary">
+            <div class="text-center small">
+                &copy; 2026 Université de l'Assomption au Congo. Tous droits réservés.
+            </div>
+        </div>
+    </footer>
+    
+    <!-- ==================== SCRIPTS ==================== -->
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Socket.IO pour notifications temps réel (optionnel) -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- Script de base pour notifications -->
+    <script>
+        // Configuration globale
+        const SESSION_ROLE = "{{ session.role }}";
+        const SESSION_USER_ID = "{{ session.user_id }}";
+        
+        // Fonction pour charger les notifications rapides
+        function loadQuickNotifications() {
+            $.ajax({
+                url: '/api/notifications/non_lues',
+                method: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    const count = data.count;
+                    const $badge = $('#quickNotificationsCount');
+                    const $navBadge = $('#navNotificationsBadge');
+                    
+                    if (count > 0) {
+                        $badge.text(count).removeClass('d-none');
+                        $navBadge.text(count).removeClass('d-none');
+                        
+                        // Construire la liste des notifications
+                        let html = '<div class="list-group list-group-flush">';
+                        data.notifications.forEach(function(notif) {
+                            const date = new Date(notif.date_creation);
+                            const timeAgo = getTimeAgo(date);
+                            html += `
+                                <a href="${notif.lien || '#'}" class="list-group-item list-group-item-action notification-item" data-id="${notif.id}">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <small class="text-muted">${timeAgo}</small>
+                                        <span class="badge bg-${getNotificationColor(notif.type)}">${notif.type}</span>
+                                    </div>
+                                    <div class="mt-1">
+                                        <strong>${escapeHtml(notif.titre)}</strong>
+                                        <p class="small text-muted mb-0">${escapeHtml(notif.message.substring(0, 100))}${notif.message.length > 100 ? '...' : ''}</p>
+                                    </div>
+                                </a>
+                            `;
+                        });
+                        html += '</div>';
+                        if (data.notifications.length === 0) {
+                            html = '<div class="p-3 text-center text-muted"><i class="fas fa-bell-slash fa-2x mb-2 d-block"></i>Aucune notification non lue</div>';
+                        }
+                        $('#quickNotificationsList').html(html);
+                        
+                        // Marquer comme lue au clic
+                        $('.notification-item').on('click', function(e) {
+                            const notifId = $(this).data('id');
+                            $.post('/notifications/marquer_lue/' + notifId);
+                        });
+                    } else {
+                        $badge.addClass('d-none');
+                        $navBadge.addClass('d-none');
+                        $('#quickNotificationsList').html('<div class="p-3 text-center text-muted"><i class="fas fa-bell-slash fa-2x mb-2 d-block"></i>Aucune notification non lue</div>');
+                    }
+                }
+            });
+        }
+        
+        // Fonction utilitaire pour le temps écoulé
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            if (seconds < 60) return 'à l\'instant';
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes} min`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours} h`;
+            const days = Math.floor(hours / 24);
+            if (days < 7) return `${days} j`;
+            return date.toLocaleDateString();
+        }
+        
+        // Couleur selon type de notification
+        function getNotificationColor(type) {
+            const colors = {
+                'success': 'success',
+                'danger': 'danger',
+                'warning': 'warning',
+                'info': 'info',
+                'email': 'secondary',
+                'sms': 'secondary'
+            };
+            return colors[type] || 'primary';
+        }
+        
+        // Échappement HTML simple
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        
+        // Afficher/masquer la barre de progression
+        function showProgress() {
+            $('#loadingProgress').removeClass('d-none');
+            let width = 0;
+            const interval = setInterval(function() {
+                width += 10;
+                $('#loadingProgress .progress-bar').css('width', width + '%');
+                if (width >= 90) clearInterval(interval);
+            }, 200);
+            return interval;
+        }
+        
+        function hideProgress(interval) {
+            $('#loadingProgress .progress-bar').css('width', '100%');
+            setTimeout(function() {
+                $('#loadingProgress').addClass('d-none');
+                $('#loadingProgress .progress-bar').css('width', '0%');
+            }, 500);
+            if (interval) clearInterval(interval);
+        }
+        
+        // Si utilisateur connecté, charger notifications périodiquement
+        {% if session.user_id %}
+        $(document).ready(function() {
+            loadQuickNotifications();
+            setInterval(loadQuickNotifications, 30000); // Toutes les 30 secondes
+            
+            // Connexion WebSocket pour notifications temps réel (optionnel)
+            // const socket = io();
+            // socket.on('new_notification', function(data) {
+            //     loadQuickNotifications();
+            // });
+        });
+        {% endif %}
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

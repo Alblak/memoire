@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Connexion - UAC{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-lg mt-5">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <i class="fas fa-university fa-2x mb-2"></i>
+                    <h4 class="mb-0">Connexion</h4>
+                    <p class="mb-0 small">Système de Gestion des Mémoires</p>
+                </div>
+                <div class="card-body p-4">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Email institutionnel</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                <input type="email" name="email" class="form-control" placeholder="exemple@uaconline.edu.cd" required>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Mot de passe</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 py-2">
+                            <i class="fas fa-sign-in-alt me-2"></i> Se connecter
+                        </button>
+                    </form>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-center small text-muted">
+                        <p class="mb-1">Comptes de test :</p>
+                        <p class="mb-0">📧 doyen_shs@uaconline.edu.cd / password123</p>
+                        <p class="mb-0">📧 directeur_shs@uaconline.edu.cd / password123</p>
+                        <p>📧 etudiant_shs@uaconline.edu.cd / password123</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

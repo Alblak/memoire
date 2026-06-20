@@ -1,0 +1,578 @@
+{% extends "base.html" %}
+
+{% block title %}Tableau de bord - Étudiant UAC{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        transition: transform 0.3s ease;
+        border: none;
+        border-radius: 15px;
+        overflow: hidden;
+    }
+    .stat-card:hover { transform: translateY(-5px); }
+    .stat-icon { font-size: 2.5rem; opacity: 0.3; position: absolute; right: 15px; bottom: 15px; }
+    .sujet-card { 
+        transition: all 0.2s;
+        margin-bottom: 15px;
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+    }
+    .sujet-card:hover { 
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1); 
+        transform: translateY(-3px);
+    }
+    .btn-soumettre {
+        transition: all 0.2s;
+    }
+    .btn-soumettre:hover {
+        transform: scale(1.02);
+    }
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 500;
+        display: inline-block;
+    }
+    .status-en_attente { background: #fff3cd; color: #856404; }
+    .status-approuve { background: #d4edda; color: #155724; }
+    .status-en_cours { background: #cce5ff; color: #004085; }
+    .status-finalise { background: #d1ecf1; color: #0c5460; }
+    .status-rejete { background: #f8d7da; color: #721c24; }
+    
+    .progress-thin {
+        height: 6px;
+        border-radius: 3px;
+    }
+    
+    /* Style pour l'affichage du chapitre courant */
+    .chapitre-actuel {
+        background: #e8f4fd;
+        border-left: 4px solid #0d6efd;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    .chapitre-actuel strong {
+        color: #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- En-tête avec bienvenue -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="display-6 fw-bold">
+                <i class="fas fa-user-graduate text-primary me-2"></i>
+                Bonjour, {{ session.user_prenom }} {{ session.user_nom }}
+            </h1>
+            <p class="text-muted">Gérez vos mémoires et soumettez vos travaux</p>
+        </div>
+        <div class="text-end">
+            <span class="badge bg-primary p-2">
+                <i class="fas fa-calendar-alt me-1"></i> Année académique: {{ annee_en_cours }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Cartes de statistiques -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-3">
+            <div class="card stat-card bg-primary text-white h-100">
+                <div class="card-body position-relative">
+                    <h3 class="card-title mb-0">{{ stats.total_sujets|default(0) }}</h3>
+                    <p class="mb-0">Total sujets</p>
+                    <i class="fas fa-file-alt stat-icon"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-success text-white h-100">
+                <div class="card-body position-relative">
+                    <h3 class="card-title mb-0">{{ stats.sujets_finalises|default(0) }}</h3>
+                    <p class="mb-0">Mémoires finalisés</p>
+                    <i class="fas fa-check-circle stat-icon"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-warning text-dark h-100">
+                <div class="card-body position-relative">
+                    <h3 class="card-title mb-0">{{ stats.sujets_en_cours|default(0) }}</h3>
+                    <p class="mb-0">En cours</p>
+                    <i class="fas fa-spinner stat-icon"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-info text-white h-100">
+                <div class="card-body position-relative">
+                    <h3 class="card-title mb-0">{{ stats.travaux_attente|default(0) }}</h3>
+                    <p class="mb-0">Travaux en attente</p>
+                    <i class="fas fa-clock stat-icon"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Carte Assistant Chatbot -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-12">
+            <div class="card shadow-sm border-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; overflow: hidden;">
+                <div class="card-body p-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <div style="font-size: 3rem;">
+                                    <i class="fas fa-robot"></i>
+                                </div>
+                                <div>
+                                    <h5 class="card-title mb-2" style="color: white;">
+                                        🤖 Assistant d'Aide aux Étudiants
+                                    </h5>
+                                    <p class="card-text mb-0" style="opacity: 0.95;">
+                                        Posez vos questions sur les <strong>informations administratives</strong>, 
+                                        <strong>conseils méthodologiques</strong>, <strong>assistance à la rédaction</strong> 
+                                        ou <strong>recherche documentaire</strong>.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                            <a href="{{ url_for('chatbot_interface') }}" class="btn btn-light btn-lg" style="font-weight: 600;">
+                                <i class="fas fa-comments me-2"></i> Ouvrir le Chatbot
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section principale: Mes sujets -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold">
+                <i class="fas fa-list me-2 text-primary"></i>
+                Mes sujets de mémoire
+            </h5>
+            <a href="{{ url_for('soumettre_sujet') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus me-1"></i> Nouveau sujet
+            </a>
+        </div>
+        <div class="card-body">
+            {% if sujets and sujets|length > 0 %}
+                {% for sujet in sujets %}
+                    <div class="card sujet-card">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-7">
+                                    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                                        <span class="status-badge status-{{ sujet.statut }}">
+                                            {% if sujet.statut == 'en_attente' %}
+                                                <i class="fas fa-hourglass-half me-1"></i> En attente validation
+                                            {% elif sujet.statut == 'approuve' %}
+                                                <i class="fas fa-check-circle me-1"></i> Approuvé
+                                            {% elif sujet.statut == 'rejete' %}
+                                                <i class="fas fa-times-circle me-1"></i> Rejeté
+                                            {% elif sujet.statut == 'en_cours' %}
+                                                <i class="fas fa-play-circle me-1"></i> En cours
+                                            {% elif sujet.statut == 'finalise' %}
+                                                <i class="fas fa-flag-checkered me-1"></i> Finalisé
+                                            {% else %}
+                                                <i class="fas fa-question-circle me-1"></i> {{ sujet.statut }}
+                                            {% endif %}
+                                        </span>
+                                        <span class="badge bg-secondary">{{ sujet.domaine_code|default('?') }} - {{ sujet.domaine_nom|default('Domaine') }}</span>
+                                        {% if sujet.directeur_nom %}
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-chalkboard-user me-1"></i> Dir: {{ sujet.directeur_nom }}
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <h6 class="mb-2 fw-semibold">{{ sujet.titre|default('Sans titre') }}</h6>
+                                    
+                                    <!-- Affichage du chapitre courant -->
+                                    {% if sujet.statut == 'en_cours' and sujet.chapitre_courant %}
+                                    <div class="chapitre-actuel">
+                                        <i class="fas fa-book-open me-2"></i>
+                                        <strong>Chapitre à soumettre :</strong> 
+                                        Chapitre {{ sujet.chapitre_courant }} - 
+                                        {% if sujet.chapitre_courant == 1 %}{{ sujet.chapitre_1_titre|default('Introduction générale') }}
+                                        {% elif sujet.chapitre_courant == 2 %}{{ sujet.chapitre_2_titre|default('Revue de littérature') }}
+                                        {% elif sujet.chapitre_courant == 3 %}{{ sujet.chapitre_3_titre|default('Méthodologie') }}
+                                        {% elif sujet.chapitre_courant == 4 %}{{ sujet.chapitre_4_titre|default('Résultats et analyses') }}
+                                        {% elif sujet.chapitre_courant == 5 %}{{ sujet.chapitre_5_titre|default('Discussion et recommandations') }}
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="row small text-muted">
+                                        <div class="col-md-6">
+                                            <i class="fas fa-calendar me-1"></i> Soumis le: {{ sujet.date_soumission.strftime('%d/%m/%Y') if sujet.date_soumission else 'Date inconnue' }}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <i class="fas fa-code-branch me-1"></i> Versions: {{ sujet.nb_versions|default(0) }} total, {{ sujet.versions_validees|default(0) }} validées
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    {% set total = sujet.nb_versions|default(0) %}
+                                    {% set validees = sujet.versions_validees|default(0) %}
+                                    {% set progress = (validees / total * 100) if total > 0 else 0 %}
+                                    <div class="progress progress-thin mb-2">
+                                        <div class="progress-bar bg-success" style="width: {{ progress }}%"></div>
+                                    </div>
+                                    <small class="text-muted">Progression: {{ "%.0f"|format(progress) }}%</small>
+                                    {% set attente = sujet.versions_en_attente|default(0) %}
+                                    {% if attente > 0 %}
+                                        <div class="mt-1">
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="fas fa-clock me-1"></i> {{ attente }} en attente
+                                            </span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-2 text-end">
+                                    {% if sujet.statut == 'en_cours' and sujet.directeur_id %}
+                                        <div class="d-grid gap-2">
+                                            <a href="{{ url_for('voir_sujet', sujet_id=sujet.sujet_id) }}" class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-eye me-1"></i> Voir détails
+                                            </a>
+                                            <button class="btn btn-success btn-sm btn-soumettre" 
+                                                    onclick="ouvrirModalSoumission({{ sujet.sujet_id }}, '{{ sujet.titre|replace("'", "\\'") }}', {{ sujet.chapitre_courant|default(1) }})">
+                                                <i class="fas fa-upload me-1"></i> Soumettre chapitre {{ sujet.chapitre_courant }}
+                                            </button>
+                                        </div>
+                                    {% elif sujet.statut == 'en_attente' %}
+                                        <span class="badge bg-warning text-dark p-2 d-block">En validation...</span>
+                                    {% elif sujet.statut == 'finalise' %}
+                                        <span class="badge bg-success p-2 d-block">Félicitations!</span>
+                                    {% elif sujet.statut == 'approuve' %}
+                                        <span class="badge bg-info p-2 d-block">En attente de début</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary p-2 d-block">{{ sujet.statut|default('Statut inconnu') }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Vous n'avez encore soumis aucun sujet.</p>
+                    <a href="{{ url_for('soumettre_sujet') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i> Soumettre mon premier sujet
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Progression graphique -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-chart-line text-primary me-2"></i>
+                        Progression des travaux
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if progression and progression|length > 0 %}
+                        <canvas id="progressionChart" height="250"></canvas>
+                        <div class="small text-muted mt-3">
+                            <i class="fas fa-info-circle me-1"></i> Basé sur les versions validées par votre directeur
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-chart-simple fa-2x text-muted mb-2"></i>
+                            <p class="text-muted small">Commencez un travail pour voir votre progression</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Dernières notifications -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-bell text-primary me-2"></i>
+                        Notifications récentes
+                    </h5>
+                    <a href="{{ url_for('notifications_centre') }}" class="text-decoration-none small">Voir tout <i class="fas fa-arrow-right ms-1"></i></a>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_notifications and recent_notifications|length > 0 %}
+                        <div class="list-group list-group-flush">
+                            {% for notif in recent_notifications %}
+                                <div class="list-group-item list-group-item-action p-3 notification-item" data-id="{{ notif.id }}">
+                                    <div class="d-flex">
+                                        <div class="flex-shrink-0">
+                                            {% if notif.type == 'success' %}
+                                                <i class="fas fa-check-circle text-success fs-5"></i>
+                                            {% elif notif.type == 'danger' %}
+                                                <i class="fas fa-exclamation-triangle text-danger fs-5"></i>
+                                            {% elif notif.type == 'warning' %}
+                                                <i class="fas fa-clock text-warning fs-5"></i>
+                                            {% else %}
+                                                <i class="fas fa-info-circle text-info fs-5"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <div class="fw-semibold small">{{ notif.titre }}</div>
+                                            <div class="small text-muted">{{ notif.message[:100] }}{% if notif.message|length > 100 %}...{% endif %}</div>
+                                            <small class="text-muted">{{ notif.date_creation.strftime('%d/%m/%Y %H:%M') if notif.date_creation else '' }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-bell-slash fa-2x text-muted mb-2"></i>
+                            <p class="text-muted small">Aucune notification</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conseils et astuces -->
+    <div class="row mt-2">
+        <div class="col-12">
+            <div class="alert alert-info alert-dismissible fade show mb-0" role="alert">
+                <div class="d-flex">
+                    <i class="fas fa-lightbulb fs-3 me-3"></i>
+                    <div>
+                        <strong>Conseil du jour:</strong><br>
+                        {% if not sujets or sujets|length == 0 %}
+                            Commencez par soumettre un sujet pour que le doyen vous attribue un directeur.
+                        {% elif stats.travaux_attente and stats.travaux_attente > 0 %}
+                            Vous avez {{ stats.travaux_attente }} travail(s) en attente de correction. 
+                            Consultez les commentaires de votre directeur pour progresser.
+                        {% else %}
+                            N'oubliez pas de soumettre régulièrement vos chapitres. 
+                            Plus vous soumettez tôt, plus votre directeur peut vous faire un retour rapide!
+                        {% endif %}
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour soumettre un chapitre (VERSION CORRIGÉE) -->
+<div class="modal fade" id="soumettreChapitreModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-pen-fancy me-2"></i> Soumettre un chapitre
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="formSoumissionChapitre" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="alert alert-info mb-3" id="infoChapitreActuel">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Chapitre à soumettre :</strong> <span id="infoChapitreNumero">-</span>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Chapitre <span class="text-danger">*</span></label>
+                            <!-- REMPLACÉ: input text par select avec numéros -->
+                            <select name="chapitre" class="form-control" id="chapitreSelect" required>
+                                <option value="">-- Sélectionnez un chapitre --</option>
+                                <option value="1">Chapitre 1 - Introduction générale</option>
+                                <option value="2">Chapitre 2 - Revue de littérature</option>
+                                <option value="3">Chapitre 3 - Méthodologie</option>
+                                <option value="4">Chapitre 4 - Résultats et analyses</option>
+                                <option value="5">Chapitre 5 - Discussion et recommandations</option>
+                            </select>
+                            <div class="form-text">Seul le chapitre actuellement déverrouillé (affiché ci-dessus) peut être soumis.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Titre du chapitre <span class="text-danger">*</span></label>
+                            <input type="text" name="titre_chapitre" class="form-control" id="titreChapitreInput" 
+                                   placeholder="Titre du chapitre..." required>
+                            <div class="form-text">Le titre sera automatiquement rempli selon le chapitre choisi</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Contenu du chapitre</label>
+                            <textarea name="contenu" rows="8" class="form-control" id="contenuInput" 
+                                      placeholder="Rédigez votre chapitre ici..."></textarea>
+                            <div class="form-text">Vous pouvez rédiger directement ou joindre un fichier</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Fichier joint (optionnel)</label>
+                            <input type="file" name="fichier" class="form-control" id="fichierInput" accept=".pdf,.doc,.docx,.txt">
+                            <div class="form-text">Formats acceptés: PDF, DOC, DOCX, TXT (max 20MB)</div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="confirmOriginalite" required>
+                            <label class="form-check-label" for="confirmOriginalite">
+                                Je certifie que ce travail est original et respecte les règles académiques de l'UAC.
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary" id="btnSoumettreChapitre">
+                        <i class="fas fa-paper-plane me-1"></i> Soumettre le chapitre
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentSujetId = null;
+    let currentChapitreAttendu = null;
+    
+    // Mapping des titres par numéro de chapitre
+    const chapitreTitres = {
+        1: 'Introduction générale',
+        2: 'Revue de littérature',
+        3: 'Méthodologie',
+        4: 'Résultats et analyses',
+        5: 'Discussion et recommandations'
+    };
+    
+    // Fonction pour ouvrir le modal de soumission (MODIFIÉE)
+    function ouvrirModalSoumission(sujetId, sujetTitre, chapitreAttendu) {
+        currentSujetId = sujetId;
+        currentChapitreAttendu = chapitreAttendu;
+        
+        // Mettre à jour l'action du formulaire
+        document.getElementById('formSoumissionChapitre').action = "/etudiant/soumettre_version/" + sujetId;
+        
+        // Mettre à jour l'info du chapitre actuel dans le modal
+        document.getElementById('infoChapitreNumero').innerHTML = 
+            'Chapitre ' + chapitreAttendu + ' - ' + (chapitreTitres[chapitreAttendu] || 'À définir');
+        
+        // Réinitialiser le formulaire
+        document.getElementById('chapitreSelect').value = '';
+        document.getElementById('titreChapitreInput').value = '';
+        document.getElementById('contenuInput').value = '';
+        document.getElementById('fichierInput').value = '';
+        document.getElementById('confirmOriginalite').checked = false;
+        
+        // Afficher le modal
+        $('#soumettreChapitreModal').modal('show');
+    }
+    
+    // AUTO-REMPLISSAGE: Quand le chapitre est sélectionné, remplir automatiquement le titre
+    document.getElementById('chapitreSelect')?.addEventListener('change', function() {
+        const titreInput = document.getElementById('titreChapitreInput');
+        const selectedValue = this.value;
+        
+        if (selectedValue && chapitreTitres[selectedValue]) {
+            titreInput.value = chapitreTitres[selectedValue];
+        } else {
+            titreInput.value = '';
+        }
+    });
+    
+    // Validation du formulaire avant soumission (MODIFIÉE)
+    document.getElementById('formSoumissionChapitre').addEventListener('submit', function(e) {
+        const chapitre = document.getElementById('chapitreSelect').value;
+        const titre = document.getElementById('titreChapitreInput').value.trim();
+        const confirm = document.getElementById('confirmOriginalite').checked;
+        
+        // Vérification 1: Chapitre sélectionné
+        if (!chapitre) {
+            alert('Veuillez sélectionner le numéro du chapitre');
+            e.preventDefault();
+            return false;
+        }
+        
+        // Vérification 2: Vérifier que l'étudiant soumet bien le chapitre attendu
+        if (parseInt(chapitre) !== currentChapitreAttendu) {
+            alert('ERREUR: Vous devez soumettre le chapitre ' + currentChapitreAttendu + 
+                  ' (Chapitre ' + currentChapitreAttendu + ' - ' + chapitreTitres[currentChapitreAttendu] + ')\n' +
+                  'Veuillez sélectionner le bon chapitre.');
+            e.preventDefault();
+            return false;
+        }
+        
+        // Vérification 3: Titre présent
+        if (!titre) {
+            alert('Veuillez saisir le titre du chapitre');
+            e.preventDefault();
+            return false;
+        }
+        
+        // Vérification 4: Confirmation d'originalité
+        if (!confirm) {
+            alert('Veuillez confirmer que votre travail est original');
+            e.preventDefault();
+            return false;
+        }
+        
+        // Désactiver le bouton pendant l'envoi
+        const btn = document.getElementById('btnSoumettreChapitre');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Envoi en cours...';
+        return true;
+    });
+    
+    // Graphique de progression
+    {% if progression and progression|length > 0 %}
+    const ctx = document.getElementById('progressionChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [{% for p in progression %}'{{ p.titre[:20] }}...'{% if not loop.last %}, {% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Versions soumises',
+                data: [{% for p in progression %}{{ p.total_versions }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgb(54, 162, 235)',
+                borderWidth: 1
+            }, {
+                label: 'Validées par le directeur',
+                data: [{% for p in progression %}{{ p.versions_validees }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                borderColor: 'rgb(75, 192, 192)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Nombre de versions' }
+                }
+            },
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+    {% endif %}
+
+    // Marquer notification comme lue au clic
+    $('.notification-item').on('click', function() {
+        const notifId = $(this).data('id');
+        if (notifId) {
+            $.post('/notifications/marquer_lue/' + notifId);
+        }
+    });
+</script>
+{% endblock %}

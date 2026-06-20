@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Corriger une version - Directeur UAC{% endblock %}
+
+{% block extra_css %}
+<style>
+    .version-preview {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-left: 4px solid #0d6efd;
+    }
+    .version-meta {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .contenu-version {
+        background-color: white;
+        border-radius: 8px;
+        padding: 15px;
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+    .feedback-section {
+        background-color: #e7f3ff;
+        border-radius: 10px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+    .btn-action {
+        min-width: 150px;
+    }
+    .attachment-link {
+        display: inline-block;
+        margin-top: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- En-tête -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="display-6 fw-bold">
+                        <i class="fas fa-edit text-warning me-2"></i>
+                        Correction du travail
+                    </h1>
+                    <p class="text-muted">Étudiant: <strong>{{ version.etudiant_nom }}</strong></p>
+                </div>
+                <div>
+                    <span class="badge bg-secondary fs-6 p-2">
+                        <i class="fas fa-code-branch me-1"></i> Version #{{ version.numero_version }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-file-alt me-2 text-primary"></i>
+                        {{ version.sujet_titre }}
+                    </h5>
+                    <small class="text-muted">
+                        <i class="fas fa-calendar me-1"></i> Soumis le: {{ version.date_soumission.strftime('%d/%m/%Y à %H:%M') if version.date_soumission else 'Date inconnue' }}
+                    </small>
+                </div>
+                <div class="card-body">
+                    <!-- Informations du chapitre -->
+                    <div class="version-preview">
+                        <div class="version-meta">
+                            <strong><i class="fas fa-tag me-1"></i> Chapitre:</strong> {{ version.chapitre }}
+                            <span class="mx-3">|</span>
+                            <strong><i class="fas fa-heading me-1"></i> Titre:</strong> {{ version.titre_chapitre }}
+                        </div>
+                        <div class="contenu-version">
+                            {% if version.contenu %}
+                                {{ version.contenu|nl2br }}
+                            {% else %}
+                                <p class="text-muted">Aucun contenu texte. L'étudiant a joint un fichier.</p>
+                            {% endif %}
+                        </div>
+                        <!-- CORRECTION: Lien de téléchargement fonctionnel -->
+                        {% if version.fichier_chemin %}
+                            <div class="attachment-link">
+                                {% set filename = version.fichier_chemin.replace('uploads/', '') %}
+                                <a href="{{ url_for('telecharger_fichier', filename=filename) }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                    <i class="fas fa-download me-1"></i> Télécharger le fichier joint
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Formulaire de correction -->
+                    <form method="POST" enctype="multipart/form-data" id="correctionForm">
+                        <div class="feedback-section">
+                            <h6 class="fw-bold mb-3">
+                                <i class="fas fa-comment-dots text-primary me-2"></i>
+                                Commentaires du directeur
+                            </h6>
+                            <div class="mb-3">
+                                <textarea name="commentaire" rows="5" class="form-control" 
+                                          placeholder="Rédigez vos commentaires, suggestions ou corrections ici..."
+                                          required></textarea>
+                                <div class="form-text mt-2">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Soyez précis et constructif dans vos commentaires pour aider l'étudiant à progresser.
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    <i class="fas fa-file-upload me-1"></i>
+                                    Fichier corrigé (optionnel)
+                                </label>
+                                <input type="file" name="fichier_corrige" class="form-control" accept=".pdf,.doc,.docx,.txt">
+                                <div class="form-text">Vous pouvez joindre une version corrigée du fichier.</div>
+                            </div>
+
+                            <div class="row g-3 mt-2">
+                                <div class="col-md-6">
+                                    <button type="submit" name="action" value="corriger" 
+                                            class="btn btn-warning btn-lg w-100 btn-action"
+                                            onclick="return confirmCorrection()">
+                                        <i class="fas fa-undo-alt me-2"></i> Demander des corrections
+                                    </button>
+                                    <div class="small text-muted text-center mt-2">
+                                        L'étudiant devra revoir son travail
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <button type="submit" name="action" value="valider" 
+                                            class="btn btn-success btn-lg w-100 btn-action"
+                                            onclick="return confirmValidation()">
+                                        <i class="fas fa-check-circle me-2"></i> Valider ce chapitre
+                                    </button>
+                                    <div class="small text-muted text-center mt-2">
+                                        Le chapitre est accepté, l'étudiant peut passer au suivant
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Avertissement -->
+                    <div class="alert alert-warning mt-4 small">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>Conseil:</strong>
+                        <ul class="mb-0 mt-1">
+                            <li>Privilégiez des commentaires spécifiques et actionnables</li>
+                            <li>Indiquez clairement les passages à améliorer</li>
+                            <li>Soyez encourageant tout en étant exigeant sur la qualité académique</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="mt-3 text-center">
+                <a href="{{ url_for('dashboard_directeur') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Retour au tableau de bord
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function confirmCorrection() {
+        const commentaire = document.querySelector('textarea[name="commentaire"]').value.trim();
+        if (!commentaire) {
+            alert('Veuillez saisir un commentaire avant de renvoyer le travail à l\'étudiant.');
+            return false;
+        }
+        return confirm('⚠️ Attention: Ce travail sera renvoyé à l\'étudiant avec vos corrections. Confirmez-vous ?');
+    }
+    
+    function confirmValidation() {
+        const commentaire = document.querySelector('textarea[name="commentaire"]').value.trim();
+        if (!commentaire) {
+            alert('Veuillez saisir un commentaire pour valider le travail.');
+            return false;
+        }
+        return confirm('✅ Confirmez-vous la validation de ce chapitre ?\n\nL\'étudiant pourra passer au chapitre suivant.');
+    }
+    
+    // Auto-resize du textarea
+    document.querySelector('textarea[name="commentaire"]').addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+</script>
+{% endblock %}

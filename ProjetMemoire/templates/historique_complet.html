@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}Historique complet - Doyen UAC{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-bar {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .stat-summary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        color: white;
+    }
+    .table-hover tbody tr:hover {
+        background-color: rgba(102, 126, 234, 0.05);
+        cursor: pointer;
+    }
+    .export-buttons button {
+        transition: all 0.2s;
+    }
+    @media print {
+        .filter-bar, .export-buttons, .btn-group, .no-print {
+            display: none !important;
+        }
+        .card {
+            box-shadow: none !important;
+            border: 1px solid #ddd !important;
+        }
+        .table {
+            font-size: 10pt !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="display-6 fw-bold">
+                <i class="fas fa-history text-primary me-2"></i>
+                Historique complet
+            </h1>
+            <p class="text-muted">Archives et statistiques détaillées de la faculté de <strong>{{ domaine_nom }}</strong></p>
+        </div>
+        <div class="export-buttons">
+            <button class="btn btn-sm btn-outline-success" onclick="exportToExcel()">
+                <i class="fas fa-file-excel me-1"></i> Excel
+            </button>
+            <button class="btn btn-sm btn-outline-danger" onclick="exportToPDF()">
+                <i class="fas fa-file-pdf me-1"></i> PDF
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
+                <i class="fas fa-print me-1"></i> Imprimer
+            </button>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="filter-bar no-print">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label small">Année académique</label>
+                <select name="annee" class="form-select">
+                    <option value="all" {% if annee_selected == 'all' %}selected{% endif %}>Toutes</option>
+                    {% for annee in annees_disponibles %}
+                        <option value="{{ annee.annee }}" {% if annee_selected|string == annee.annee|string %}selected{% endif %}>
+                            {{ annee.annee }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">Statut</label>
+                <select name="statut" class="form-select">
+                    <option value="all" {% if statut_selected == 'all' %}selected{% endif %}>Tous</option>
+                    <option value="en_attente" {% if statut_selected == 'en_attente' %}selected{% endif %}>En attente</option>
+                    <option value="approuve" {% if statut_selected == 'approuve' %}selected{% endif %}>Approuvé</option>
+                    <option value="en_cours" {% if statut_selected == 'en_cours' %}selected{% endif %}>En cours</option>
+                    <option value="finalise" {% if statut_selected == 'finalise' %}selected{% endif %}>Finalisé</option>
+                    <option value="rejete" {% if statut_selected == 'rejete' %}selected{% endif %}>Rejeté</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter me-1"></i> Appliquer les filtres
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Résumé statistique -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="stat-summary p-3">
+                <div class="text-center">
+                    <div class="display-6 fw-bold">{{ sujets|length }}</div>
+                    <div class="small opacity-75">Total sujets</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-summary p-3" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                <div class="text-center">
+                    <div class="display-6 fw-bold">
+                        {{ sujets|selectattr('statut', 'equalto', 'finalise')|list|length }}
+                    </div>
+                    <div class="small opacity-75">Finalisés</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-summary p-3" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="text-center">
+                    <div class="display-6 fw-bold">
+                        {% set total_taux = 0 %}
+                        {% set count_taux = 0 %}
+                        {% for s in sujets %}
+                            {% if s.taux_similarite is not none and s.taux_similarite > 0 %}
+                                {% set total_taux = total_taux + s.taux_similarite %}
+                                {% set count_taux = count_taux + 1 %}
+                            {% endif %}
+                        {% endfor %}
+                        {% if count_taux > 0 %}
+                            {{ (total_taux / count_taux)|round }}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </div>
+                    <div class="small opacity-75">Taux similarité moyen</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-summary p-3" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="text-center">
+                    <div class="display-6 fw-bold">
+                        {{ sujets|map(attribute='directeur_nom')|select('defined')|list|unique|list|length }}
+                    </div>
+                    <div class="small opacity-75">Directeurs actifs</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableau des sujets -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="historyTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Étudiant</th>
+                            <th>Titre</th>
+                            <th>Domaine</th>
+                            <th>Directeur</th>
+                            <th>Soumission</th>
+                            <th>Validation</th>
+                            <th>Statut</th>
+                            <th>Similarité</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sujet in sujets %}
+                        <tr>
+                            <td>
+                                <strong>{{ sujet.etudiant_nom }}</strong><br>
+                                <small class="text-muted">{{ sujet.matricule }}</small>
+                            </td>
+                            <td>
+                                <div class="fw-semibold">{{ sujet.titre }}</div>
+                            </td>
+                            <td>{{ sujet.domaine_nom }}</td>
+                            <td>{{ sujet.directeur_nom or '-' }}</td>
+                            <td>
+                                <small>{{ sujet.date_soumission.strftime('%d/%m/%Y') if sujet.date_soumission else '-' }}</small>
+                            </td>
+                            <td>
+                                <small>{{ sujet.date_finalisation.strftime('%d/%m/%Y') if sujet.date_finalisation else '-' }}</small>
+                            </td>
+                            <td>
+                                <span class="badge status-{{ sujet.statut }}">
+                                    {% if sujet.statut == 'finalise' %}✓ Finalisé
+                                    {% elif sujet.statut == 'en_cours' %}⟳ En cours
+                                    {% elif sujet.statut == 'en_attente' %}⏳ En attente
+                                    {% elif sujet.statut == 'approuve' %}✓ Approuvé
+                                    {% elif sujet.statut == 'rejete' %}✗ Rejeté
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                {% if sujet.taux_similarite %}
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress flex-grow-1 me-2" style="height: 4px;">
+                                            <div class="progress-bar {% if sujet.taux_similarite <= 20 %}bg-success{% elif sujet.taux_similarite <= 35 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                                 style="width: {{ sujet.taux_similarite }}%"></div>
+                                        </div>
+                                        <small>{{ "%.0f"|format(sujet.taux_similarite) }}%</small>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('voir_sujet', sujet_id=sujet.id) }}" class="btn btn-outline-primary" title="Voir">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if sujet.rapport_similarite %}
+                                        <a href="{{ url_for('telecharger_fichier', filename=sujet.rapport_similarite.replace('uploads/', '')) }}" class="btn btn-outline-danger" title="Rapport">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center py-5">
+                                <i class="fas fa-inbox fa-3x text-muted mb-3 d-block"></i>
+                                <p class="text-muted">Aucun sujet trouvé avec les filtres sélectionnés</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function exportToExcel() {
+        // Récupérer le tableau
+        const table = document.getElementById('historyTable');
+        const rows = table.querySelectorAll('tr');
+        
+        // Créer le contenu CSV
+        let csv = [];
+        
+        // Parcourir chaque ligne
+        for (let row of rows) {
+            const cells = row.querySelectorAll('th, td');
+            const rowData = [];
+            for (let i = 0; i < cells.length - 1; i++) { // Ignorer la dernière colonne (Actions)
+                let text = cells[i].innerText.trim();
+                // Échapper les guillemets et les virgules
+                text = text.replace(/"/g, '""');
+                if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+                    text = `"${text}"`;
+                }
+                rowData.push(text);
+            }
+            if (rowData.length > 0) {
+                csv.push(rowData.join(','));
+            }
+        }
+        
+        // Créer et télécharger le fichier
+        const blob = new Blob(["\uFEFF" + csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        const now = new Date();
+        const dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2,'0') + '-' + now.getDate().toString().padStart(2,'0');
+        link.setAttribute('download', 'historique_sujets_' + dateStr + '.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        // Notification
+        showNotification('Export Excel terminé avec succès !', 'success');
+    }
+    
+    function exportToPDF() {
+        // Sauvegarder l'état actuel
+        const originalTitle = document.title;
+        const originalHTML = document.body.innerHTML;
+        
+        // Préparer le contenu à imprimer
+        const printContent = document.getElementById('historyTable').cloneNode(true);
+        const statsContent = document.querySelector('.row.g-3.mb-4').cloneNode(true);
+        const titleContent = document.querySelector('.d-flex.justify-content-between').cloneNode(true);
+        
+        // Créer une fenêtre d'impression
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write('<html><head><title>Historique des sujets</title>');
+        printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">');
+        printWindow.document.write('<style>');
+        printWindow.document.write('body { padding: 20px; font-family: Arial, sans-serif; }');
+        printWindow.document.write('.table { width: 100%; border-collapse: collapse; }');
+        printWindow.document.write('.table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: left; }');
+        printWindow.document.write('.table th { background-color: #f2f2f2; }');
+        printWindow.document.write('.stat-summary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 10px; text-align: center; }');
+        printWindow.document.write('@media print { body { margin: 0; padding: 0; } }');
+        printWindow.document.write('</style>');
+        printWindow.document.write('</head><body>');
+        
+        // Ajouter le titre
+        printWindow.document.write('<h1>Historique des sujets</h1>');
+        printWindow.document.write('<p class="text-muted">Généré le ' + new Date().toLocaleString() + '</p>');
+        printWindow.document.write('<hr>');
+        
+        // Ajouter les statistiques (version simplifiée)
+        printWindow.document.write('<div class="row">');
+        const stats = document.querySelectorAll('.stat-summary');
+        stats.forEach(stat => {
+            printWindow.document.write('<div class="col-md-3" style="margin-bottom: 20px;">');
+            printWindow.document.write(stat.outerHTML);
+            printWindow.document.write('</div>');
+        });
+        printWindow.document.write('</div>');
+        
+        // Ajouter le tableau
+        printWindow.document.write('<h3>Liste des sujets</h3>');
+        printWindow.document.write(printContent.outerHTML);
+        
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        
+        // Attendre le chargement puis imprimer
+        printWindow.onload = function() {
+            printWindow.print();
+            printWindow.onafterprint = function() {
+                printWindow.close();
+            };
+        };
+        
+        showNotification('Export PDF lancé. La fenêtre d\'impression va s\'ouvrir.', 'info');
+    }
+    
+    function showNotification(message, type) {
+        // Supprimer les anciennes notifications
+        const oldNotif = document.querySelector('.export-notification');
+        if (oldNotif) oldNotif.remove();
+        
+        // Créer la notification
+        const notif = document.createElement('div');
+        notif.className = `alert alert-${type} export-notification position-fixed bottom-0 end-0 m-3`;
+        notif.style.zIndex = '9999';
+        notif.style.minWidth = '250px';
+        notif.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>${message}`;
+        document.body.appendChild(notif);
+        
+        // Disparaître après 3 secondes
+        setTimeout(() => {
+            notif.style.opacity = '0';
+            notif.style.transition = 'opacity 0.5s';
+            setTimeout(() => notif.remove(), 500);
+        }, 3000);
+    }
+    
+    // Version alternative simple avec window.print
+    function exportPDFSimple() {
+        window.print();
+    }
+</script>
+{% endblock %}
